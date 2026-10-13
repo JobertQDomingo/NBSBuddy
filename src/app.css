@@ -1,0 +1,285 @@
+/* Sticker Board (see DESIGN.md): lilac canvas, 2px ink outlines, hard offset shadows,
+   lemon / mint / tomato stickers. Every colour comes from these tokens. */
+
+@font-face {
+  font-family: "Archivo";
+  src: url("./assets/fonts/Archivo.ttf") format("truetype");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+}
+
+:root {
+  --ink: #111111;
+  --canvas: #cbbcff;
+  --surface: #ffffff;
+  --surface-alt: #ebe4ff;
+  --hover: #f3efff;
+  --text-muted: #5b5275;
+  --on-canvas-muted: #3a3159;
+  --lemon: #ffe14d;
+  --lemon-hover: #ffd426;
+  --lemon-disabled: #f4ecb8;
+  --mint: #5ee3a1;
+  --tomato: #ff5a4e;
+  --row-weekend: #ebe4ff;
+  --row-warning: #fff09a;
+  --row-mismatch: #ffcdc6;
+  --accent: #3d2bff;
+  --on-accent: #ffffff;
+  --danger-line: #d0201a;
+  --selection: #d9d2ff;
+
+  --r-pill: 6px;
+  --r-tile: 7px;
+  --r-control: 8px;
+  --r-container: 12px;
+  --line: 2px solid var(--ink);
+  --shadow-1: 2px 2px 0 var(--ink);
+  --shadow-2: 3px 3px 0 var(--ink);
+  --shadow-3: 4px 4px 0 var(--ink);
+  --shadow-4: 5px 5px 0 var(--ink);
+
+  --font: "Archivo", "Segoe UI", sans-serif;
+  color-scheme: light; /* pinned light until a real dark palette exists */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 14px/1.35 var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* Archivo Expanded Black: the scale-contrast voice. */
+.display {
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.overline {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-kerning: none;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- buttons: one step down onto the shadow when pressed, no transitions ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 14px;
+  border: var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  font: 700 14px/1.2 var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--hover);
+}
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+.btn:disabled {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+  box-shadow: none;
+  cursor: default;
+}
+.btn.primary {
+  background: var(--lemon);
+  font-weight: 800;
+}
+.btn.primary:hover {
+  background: var(--lemon-hover);
+}
+.btn.primary:disabled {
+  background: var(--lemon-disabled);
+}
+.btn.danger {
+  background: var(--tomato);
+  font-weight: 800;
+}
+.btn.danger:disabled {
+  background: var(--surface-alt);
+}
+
+.link {
+  border: 0;
+  background: none;
+  padding: 5px 6px;
+  color: var(--ink);
+  font: 800 14px var(--font);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+kbd {
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* ---- containers and stickers ---- */
+
+.card {
+  background: var(--surface);
+  border: var(--line);
+  border-radius: var(--r-container);
+  box-shadow: var(--shadow-4);
+}
+
+.sticker {
+  display: inline-block;
+  padding: 7px 12px;
+  border: var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-weight: 700;
+}
+.sticker.danger {
+  background: var(--tomato);
+}
+.sticker.attention {
+  background: var(--lemon);
+}
+.sticker.success {
+  background: var(--mint);
+}
+
+.pill {
+  display: inline-block;
+  padding: 1px 9px;
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.pill.done {
+  background: var(--mint);
+}
+.pill.due {
+  background: var(--lemon);
+}
+.pill.act {
+  background: var(--tomato);
+  border-width: 3px;
+  line-height: 16px;
+}
+
+/* ---- fields: a 3px ring on focus without moving anything ---- */
+
+input:not([type="checkbox"]),
+select,
+textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 14px/1.35 var(--font);
+}
+input:not([type="checkbox"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+input[readonly],
+textarea[readonly],
+select:disabled,
+input:disabled {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+}
+input[aria-invalid="true"] {
+  border-color: var(--danger-line);
+  box-shadow: 0 0 0 1px var(--danger-line);
+}
+select:hover:not(:disabled) {
+  background: var(--hover);
+}
+textarea {
+  resize: none;
+  field-sizing: content; /* grows with the reason, 1 to 12 lines */
+  min-height: 34px;
+  max-height: calc(12lh + 12px);
+}
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* ---- modal dialogs (native <dialog>) ---- */
+
+dialog {
+  padding: 0;
+  border: var(--line);
+  border-radius: var(--r-container);
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: var(--shadow-4);
+}
+dialog::backdrop {
+  background: rgb(17 17 17 / 0.35);
+}
+
+.scroll {
+  scrollbar-color: var(--text-muted) transparent;
+}

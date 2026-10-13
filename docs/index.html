@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NBSBuddy</title>
+  <meta name="description" content="File your OB + Change Shift in NBS in a couple of clicks and see which days need action before payroll cutoff.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+  <style>
+    :root {
+      --ink: #111; --canvas: #cbbcff; --surface: #fff; --on-canvas-muted: #3a3159; --text-muted: #5b5275;
+      --lemon: #ffe14d; --lemon-hover: #ffd426; --mint: #5ee3a1; --tomato: #ff5a4e; --accent: #3d2bff;
+      --line: 2px solid var(--ink);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 17px/1.5 Archivo, "Segoe UI", sans-serif; }
+    main { max-width: 980px; margin: 0 auto; padding: 48px 16px 64px; }
+    h1, h2, h3, p { margin: 0; }
+    .display { font-weight: 900; font-stretch: 125%; letter-spacing: -0.01em; line-height: 1.02; }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .hero { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
+    .hero svg { width: 140px; height: 140px; }
+    .hero h1 { font-size: clamp(44px, 9vw, 84px); }
+    .tagline { margin-top: 12px; font-size: 20px; font-weight: 600; max-width: 34ch; }
+
+    .get { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: center; }
+    .download {
+      display: inline-flex; align-items: center; gap: 12px; padding: 16px 26px;
+      border: var(--line); border-radius: 12px; background: var(--lemon); box-shadow: 5px 5px 0 var(--ink);
+      font-weight: 900; font-stretch: 112%; font-size: 22px; text-decoration: none;
+    }
+    .download:hover { background: var(--lemon-hover); }
+    .download:active { transform: translate(5px, 5px); box-shadow: none; }
+    .meta { color: var(--on-canvas-muted); font-weight: 600; }
+
+    .cards { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .card { padding: 20px; border: var(--line); border-radius: 12px; background: var(--surface); box-shadow: 5px 5px 0 var(--ink); }
+    .card h3 { font-size: 20px; font-weight: 900; margin: 12px 0 6px; }
+    .tag { display: inline-block; padding: 1px 10px; border: var(--line); border-radius: 6px; box-shadow: 2px 2px 0 var(--ink);
+      font-size: 13px; font-weight: 800; }
+    .mint { background: var(--mint); } .lemon { background: var(--lemon); } .tomato { background: var(--tomato); }
+
+    .install { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    .install h2 { font-size: 32px; grid-column: 1 / -1; }
+    ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+    .note { padding: 16px 18px; border: var(--line); border-radius: 12px; background: var(--lemon); }
+    .note b { display: block; margin-bottom: 4px; }
+
+    footer { margin-top: 56px; padding-top: 10px; border-top: var(--line); color: var(--on-canvas-muted); font-weight: 600; font-size: 15px; }
+
+    @media (max-width: 760px) {
+      main { padding-top: 28px; }
+      .hero { grid-template-columns: 1fr; gap: 16px; }
+      .hero svg { width: 96px; height: 96px; }
+      .cards, .install { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+      <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+      <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="48"/>
+      <circle cx="350" cy="410" r="66" fill="#111"/><circle cx="618" cy="410" r="66" fill="#111"/>
+      <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="60" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1 class="display">NBSBuddy</h1>
+      <p class="tagline">File your work-from-home OB + Change Shift in NBS in a couple of clicks, and see which days need action before payroll cutoff.</p>
+    </div>
+  </section>
+
+  <div class="get">
+    <a class="download" href="https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/NBSBuddy-setup.exe">
+      <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-4-4 4 4 4-4M3 14h10" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download for Windows
+    </a>
+    <p class="meta"><span id="version">Latest version</span> · Windows 10 / 11 · needs ZeroTier and your NBS account</p>
+  </div>
+
+  <section class="cards">
+    <div class="card">
+      <span class="tag lemon">File CS/OB</span>
+      <h3>Two clicks a day</h3>
+      <p>Pick your shift; NBSBuddy fills in the OB times and files OB and CS together, skipping whatever's already in NBS.</p>
+    </div>
+    <div class="card">
+      <span class="tag mint">Done</span> <span class="tag tomato">Needs action</span>
+      <h3>Cutoff at a glance</h3>
+      <p>Every workday of the payroll period gets one sticker, so missing, disapproved or late days jump out before cutoff.</p>
+    </div>
+    <div class="card">
+      <span class="tag">For Approval</span>
+      <h3>Undo a mistake</h3>
+      <p>Filed the wrong shift? Delete a filing while it's still For Approval, then file the day again.</p>
+    </div>
+  </section>
+
+  <section class="install">
+    <h2 class="display">Install</h2>
+    <ol>
+      <li>Click <b>Download for Windows</b> and run <code>NBSBuddy-setup.exe</code>. No admin rights needed.</li>
+      <li>Connect <b>ZeroTier</b>. NBS is only reachable on the company network.</li>
+      <li>Open NBSBuddy and sign in with your NBS username and password. Tick <b>Remember me</b> to skip sign-in next time.</li>
+    </ol>
+    <div class="note">
+      <b>"Windows protected your PC"?</b>
+      The installer isn't code-signed yet, so Windows SmartScreen asks first. Click <b>More info</b>, then <b>Run anyway</b>.
+    </div>
+  </section>
+
+  <footer>
+    Made for the team by Jobert Domingo · <a href="https://github.com/JobertQDomingo/NBSBuddy">Source on GitHub</a> ·
+    <a href="https://github.com/JobertQDomingo/NBSBuddy/releases">All releases</a>
+  </footer>
+</main>
+<script>
+  // Show the latest version next to the button; the page works fine without it.
+  fetch("https://api.github.com/repos/JobertQDomingo/NBSBuddy/releases/latest")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((rel) => {
+      if (!rel) return;
+      const date = new Date(rel.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      document.getElementById("version").textContent = `${rel.tag_name} · ${date}`;
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+# Push a tag like v0.2.0 (matching "version" in package.json) to build the Windows
+# installer and publish it as a GitHub Release. The download page links to
+# releases/latest/download/NBSBuddy-setup.exe, so every release also uploads that name.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: NBSBuddy ${{ github.ref_name }}
+          releaseBody: |
+            Download **NBSBuddy-setup.exe** below, run it, then sign in with your NBS account (ZeroTier must be connected).
+            Windows SmartScreen may warn because the installer isn't signed: click **More info → Run anyway**.
+          releaseDraft: false
+          args: --bundles nsis
+
+      - name: Upload NBSBuddy-setup.exe (stable name for the download page)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          Copy-Item $exe.FullName NBSBuddy-setup.exe
+          gh release upload "${{ github.ref_name }}" NBSBuddy-setup.exe --clobber
