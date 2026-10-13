@@ -88,7 +88,7 @@
       }
     };
     const ro = new ResizeObserver(([entry]) => {
-      if (entry.contentRect.width !== width) (width = entry.contentRect.width), run();
+      if (entry.contentRect.width !== width) (width = entry.contentRect.width), requestAnimationFrame(run);
     });
     ro.observe(node.parentElement!);
     document.fonts.ready.then(run);
