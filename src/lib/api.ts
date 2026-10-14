@@ -102,6 +102,7 @@ export type FileRequest = {
   time_out: string;
   ob_reason: string;
   cs_reason: string;
+  customer: string;
 };
 export type KindOutcome = { state: "created" | "skipped" | "failed"; message: string };
 export type FileOutcome = { ob: KindOutcome; cs: KindOutcome };
@@ -114,11 +115,12 @@ export const api = {
   profile: () => call<Profile>("profile"),
   loadPeriod: (year: number, month: number, half: number) => call<PeriodView>("load_period", { year, month, half }),
   shiftsFor: (date: string) => call<ShiftOption[]>("shifts_for", { date }),
+  customers: () => call<string[]>("customers"),
   fileDay: (request: FileRequest) => call<FileOutcome>("file_day", { request }),
   deleteFilings: (date: string, kinds: string[]) => call<string[]>("delete_filings", { date, kinds }),
 };
 
-/** Per-PC conveniences (onboarding seen, last username, reason drafts). Never required. */
+/** Per-PC conveniences (onboarding seen, last username, filing defaults). Never required. */
 export const local = {
   get(key: string, fallback = ""): string {
     try {
@@ -133,5 +135,21 @@ export const local = {
     } catch {
       /* private mode / blocked storage: fine */
     }
+  },
+};
+
+/** What a new filing starts with until Settings changes it. */
+export const DEFAULTS = { obReason: "Work from home", csReason: "WFH", customer: "315 CORPORATE OFFICE" };
+export type Defaults = typeof DEFAULTS;
+
+/** This PC's filing defaults; a blank or missing one falls back to the built-in value. */
+export const defaults = {
+  get: (): Defaults => ({
+    obReason: local.get("obReason").trim() || DEFAULTS.obReason,
+    csReason: local.get("csReason").trim() || DEFAULTS.csReason,
+    customer: local.get("customer").trim() || DEFAULTS.customer,
+  }),
+  set(d: Defaults) {
+    for (const [key, value] of Object.entries(d)) local.set(key, value.trim());
   },
 };

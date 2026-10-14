@@ -15,8 +15,8 @@
         "title": "NBSBuddy",
         "width": 1133,
         "height": 778,
-        "minWidth": 980,
-        "minHeight": 620,
+        "resizable": false,
+        "maximizable": false,
         "center": true
       }
     ],

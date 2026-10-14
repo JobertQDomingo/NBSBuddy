@@ -5,6 +5,8 @@
   import PeriodPicker from "./PeriodPicker.svelte";
   import FileDialog from "./FileDialog.svelte";
   import Profile from "./Profile.svelte";
+  import Settings from "./Settings.svelte";
+  import Icon from "./Icon.svelte";
 
   let { me, onsignedout }: { me: Me; onsignedout: (message?: string) => void } = $props();
 
@@ -16,6 +18,8 @@
   let selected = $state<string | null>(null);
   let fileDate = $state<string | null>(null);
   let showProfile = $state(false);
+  let showSettings = $state(false);
+  let defaultsVersion = $state(0); // bumped on save so an open File CS/OB picks up the new defaults
   let seq = 0; // newest load wins; stale answers are dropped
   let tbody: HTMLTableSectionElement | undefined = $state();
 
@@ -70,7 +74,7 @@
       return {
         tone: "danger",
         headline: `Couldn't load ${shortLabel(period)}`,
-        detail: "Check that ZeroTier is connected, then press Refresh (F5).",
+        detail: "Check that ZeroTier is connected, then press F5 to reload.",
         meta: "",
         tip: loadError,
       };
@@ -120,7 +124,12 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.key === "F5") e.preventDefault(); // never reload the whole page
-    if (fileDate || showProfile) return;
+    if (e.ctrlKey && e.key === "," && !showSettings && !showProfile) {
+      e.preventDefault();
+      showSettings = true; // also over File CS/OB, to fix the customer mid-filing
+      return;
+    }
+    if (fileDate || showProfile || showSettings) return;
     if (e.key === "F5") load();
     else if (e.ctrlKey && e.key.toLowerCase() === "n") fileDate = isoDate();
     else if (e.altKey && e.key === "ArrowLeft") period = stepPeriod(period, -1);
@@ -149,9 +158,24 @@
       <button class="link" onclick={() => (period = currentPeriod())}>Back to current period</button>
     {/if}
     <span class="grow"></span>
-    <button class="btn" onclick={() => load()} title="Reload this period from NBS (F5)" disabled={loading}>Refresh</button>
-    <button class="btn primary" onclick={() => (fileDate = isoDate())} title="File today's OB and CS (Ctrl+N). To file another day, double-click its row.">
-      File CS/OB
+    <button class="btn icon" onclick={() => load()} disabled={loading} aria-label="Refresh (F5)" title="Reload this period from NBS (F5)">
+      <Icon name="refresh" />
+    </button>
+    <button
+      class="btn primary icon"
+      onclick={() => (fileDate = isoDate())}
+      aria-label="File CS/OB (Ctrl+N)"
+      title="File CS/OB: file today's OB and CS (Ctrl+N). To file another day, double-click its row."
+    >
+      <Icon name="plus" />
+    </button>
+    <button
+      class="btn icon"
+      onclick={() => (showSettings = true)}
+      aria-label="Settings (Ctrl+,)"
+      title="Settings: default reasons and customer for new filings (Ctrl+,)"
+    >
+      <Icon name="gear" />
     </button>
     <button class="btn me" onclick={() => (showProfile = true)} title="Your NBS profile">
       <span class="avatar">{initials}</span>{me.first_name || me.display_name}
@@ -187,11 +211,11 @@
     <div class="scroll">
       <table aria-label="Payroll period days">
         <colgroup>
-          <col style:width="104px" /><col style:width="128px" /><col style:width="104px" /><col style:width="252px" />
-          <col style:width="52px" /><col style:width="236px" /><col />
+          <col style:width="104px" /><col style:width="128px" /><col style:width="104px" /><col style:width="72px" />
+          <col style:width="252px" /><col style:width="236px" /><col />
         </colgroup>
         <thead>
-          <tr><th>Date</th><th class="c">Status</th><th>OB time</th><th>Shift</th><th class="c">Hrs</th><th>Note</th><th>Reasons</th></tr>
+          <tr><th>Date</th><th class="c">Status</th><th>OB time</th><th class="c">OB hrs</th><th>Shift</th><th>Note</th><th>Reasons</th></tr>
         </thead>
         <tbody bind:this={tbody}>
           {#each view?.rows ?? [] as row, i (row.date)}
@@ -211,8 +235,8 @@
                 {#if row.verdict}<span class="pill {pillKind[row.verdict]}">{row.verdict}</span>{/if}
               </td>
               <td>{row.ob_time}</td>
-              <td title={row.shift}>{row.shift}</td>
               <td class="c">{row.hours}</td>
+              <td title={row.shift}>{row.shift}</td>
               <td title={row.note}>{row.note}</td>
               <td title={row.reasons_tip}>{row.reasons}</td>
             </tr>
@@ -222,14 +246,34 @@
     </div>
   </section>
 
-  <p class="footer" title={footer}>{footer}</p>
+  <p class="footer" title={footer} role="status">{footer}</p>
 </div>
 
 {#if fileDate}
-  <FileDialog date={fileDate} {rowFor} onclose={() => (fileDate = null)} onfiled={filed} ondeleted={deleted} onerror={failed} />
+  <FileDialog
+    date={fileDate}
+    {rowFor}
+    {defaultsVersion}
+    onclose={() => (fileDate = null)}
+    onfiled={filed}
+    ondeleted={deleted}
+    onerror={failed}
+    onsettings={() => (showSettings = true)}
+  />
 {/if}
 {#if showProfile}
   <Profile {me} onclose={() => (showProfile = false)} {onsignedout} onerror={failed} />
+{/if}
+{#if showSettings}
+  <Settings
+    onclose={() => (showSettings = false)}
+    onerror={failed}
+    onsaved={() => {
+      showSettings = false;
+      defaultsVersion++;
+      footer = "Saved on this PC. New filings use your new defaults.";
+    }}
+  />
 {/if}
 
 <style>
@@ -247,6 +291,10 @@
   }
   .grow {
     flex: 1;
+  }
+  .icon {
+    width: 34px;
+    padding: 0;
   }
   .me {
     padding-left: 6px;

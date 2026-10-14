@@ -7,10 +7,11 @@ Your daily NBS sidekick: file your work-from-home **Official Business (OB)** and
 ## What it does
 
 - **Board:** every day of the semi-monthly payroll period (1–15, 16–end) with one verdict: *Done*, *Waiting*, *Due today* or *Needs action* (missing, disapproved, or OB times that don't match the shift). A status strip says how many days need action before cutoff.
-- **File CS/OB:** pick the shift, and the OB times and hours come from it. It files both, skipping whichever NBS already has. Weekends ask first.
+- **File CS/OB** (the lemon + button, or Ctrl+N): pick the shift, and the OB times and hours come from it. It files both, skipping whichever NBS already has. Weekends ask first.
 - **Delete:** open a filed day and delete its OB and/or CS while NBS still has them *For Approval*, then file again.
 - **Sign-in:** your NBS account. "Remember me" keeps the login in Windows Credential Manager so the app signs in by itself next time. Log out forgets it.
 - **Profile:** your work details from NBS.
+- **Settings** (the gear, or Ctrl+,): the OB reason, CS reason and NBS customer (`315 CORPORATE OFFICE` out of the box) every new filing starts with. Saved on this PC; the File CS/OB dialog can still change the reasons for one filing.
 
 ## Develop
 
@@ -38,7 +39,7 @@ NBS_USER=you NBS_PASS=secret cargo test --manifest-path src-tauri/Cargo.toml liv
 | `src-tauri/src/shifts.rs` | Shift-name parsing and late/undertime/mismatch checks |
 | `src-tauri/src/creds.rs` | "Remember me" in Windows Credential Manager |
 | `src-tauri/src/lib.rs` | The Tauri commands the UI calls |
-| `src/` | Svelte UI: `Onboarding`, `Login`, `Board`, `FileDialog`, `Profile` |
+| `src/` | Svelte UI: `Onboarding`, `Login`, `Board`, `FileDialog`, `Profile`, `Settings` |
 | `docs/` | GitHub Pages download page |
 | `DESIGN.md` | The Sticker Board design system |
 

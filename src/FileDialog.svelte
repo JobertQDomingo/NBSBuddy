@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { api, local, type FileOutcome, type Row, type ShiftOption } from "./lib/api";
+  import { api, defaults, DEFAULTS, type FileOutcome, type Row, type ShiftOption } from "./lib/api";
   import { dayLabel, parseIso } from "./lib/period";
   import Modal from "./Modal.svelte";
   import Confirm from "./Confirm.svelte";
@@ -8,19 +8,24 @@
   let {
     date: initialDate,
     rowFor,
+    defaultsVersion = 0,
     onclose,
     onfiled,
     ondeleted,
     onerror,
+    onsettings,
   }: {
     date: string;
     /** The loaded period's row for a date; undefined outside that period. */
     rowFor: (date: string) => Row | undefined;
+    /** Bumped when Settings saves while this dialog is open. */
+    defaultsVersion?: number;
     onclose: () => void;
     /** note is empty when something failed (the dialog stays open). */
     onfiled: (date: string, note: string) => void;
     ondeleted: (date: string, kinds: string[]) => void;
     onerror: (e: unknown) => string;
+    onsettings: () => void;
   } = $props();
 
   let date = $state(untrack(() => initialDate));
@@ -28,8 +33,10 @@
   let shiftId = $state(0);
   let timeIn = $state("");
   let timeOut = $state("");
-  let obReason = $state(local.get("obReason", "Work from home"));
-  let csReason = $state(local.get("csReason", "WFH"));
+  const initial = defaults.get(); // edits here are for this filing only; Settings owns the defaults
+  let start = $state(initial);
+  let obReason = $state(initial.obReason);
+  let csReason = $state(initial.csReason);
   let busy = $state(false);
   let error = $state("");
   let confirmWeekend = $state(false);
@@ -42,6 +49,18 @@
   const weekend = $derived([0, 6].includes(parseIso(date).getDay()));
   const deletable = $derived([ob?.deletable ? "OB" : "", cs?.deletable ? "CS" : ""].filter(Boolean));
   const shift = $derived(shifts.find((s) => s.id === shiftId));
+  const ownCustomer = $derived(start.customer !== DEFAULTS.customer);
+
+  // Settings saved while this dialog is open: take the new customer, and new reasons you haven't edited here.
+  $effect(() => {
+    defaultsVersion;
+    untrack(() => {
+      const next = defaults.get();
+      if (obReason === start.obReason) obReason = next.obReason;
+      if (csReason === start.csReason) csReason = next.csReason;
+      start = next;
+    });
+  });
 
   $effect(() => {
     const d = date;
@@ -124,9 +143,8 @@
         time_out: timeOut,
         ob_reason: obReason,
         cs_reason: csReason,
+        customer: start.customer,
       });
-      local.set("obReason", obReason);
-      local.set("csReason", csReason);
       const failed = (["OB", "CS"] as const).filter((k) => out[k === "OB" ? "ob" : "cs"].state === "failed");
       if (failed.length) {
         error =
@@ -143,7 +161,7 @@
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
-    if (problem || busy) return;
+    if (problem || busy || filedView) return; // Ctrl+Enter submits even a fully filed day's form
     if (weekend) confirmWeekend = true;
     else file();
   }
@@ -188,17 +206,17 @@
         </select>
       {/if}
 
-      <label for="f-in">Time</label>
+      <label for="f-in">OB time</label>
       <div class="times">
         {#if filedView}
-          <input id="f-in" value={ob?.time_in ?? ""} readonly aria-label="Time in" />
+          <input id="f-in" value={ob?.time_in ?? ""} readonly aria-label="OB time in" />
           <span class="muted">to</span>
-          <input value={ob?.time_out ?? ""} readonly aria-label="Time out" />
+          <input value={ob?.time_out ?? ""} readonly aria-label="OB time out" />
           <b class="hours">{ob?.hours ?? ""}</b>
         {:else}
-          <input id="f-in" type="time" bind:value={timeIn} aria-label="Time in" aria-invalid={!timeIn && !!shift} disabled={busy} />
+          <input id="f-in" type="time" bind:value={timeIn} aria-label="OB time in" aria-invalid={!timeIn && !!shift} disabled={busy} />
           <span class="muted">to</span>
-          <input type="time" bind:value={timeOut} aria-label="Time out" aria-invalid={!!shift && (!timeOut || !hours)} disabled={busy} />
+          <input type="time" bind:value={timeOut} aria-label="OB time out" aria-invalid={!!shift && (!timeOut || !hours)} disabled={busy} />
           <b class="hours">{hours ? String(hours) : ""}</b>
         {/if}
         <span class="muted">hours</span>
@@ -206,7 +224,7 @@
     </fieldset>
 
     <fieldset class="card">
-      <legend class="overline">Reasons</legend>
+      <legend class="overline">Reasons and customer</legend>
       <label for="f-ob">OB reason</label>
       {#if filedView}
         <textarea id="f-ob" value={ob?.reason ?? ""} readonly rows="1"></textarea>
@@ -219,6 +237,16 @@
       {:else}
         <textarea id="f-cs" bind:value={csReason} rows="1" disabled={busy}></textarea>
       {/if}
+      <span class="label">Customer</span>
+      <p class="customer">
+        {#if ob}
+          <b>{ob.customer}</b>
+        {:else}
+          <b class:own={ownCustomer}>{start.customer}</b>
+          <span class="muted">{ownCustomer ? "your pick ·" : "·"}</span>
+          <button type="button" class="link" onclick={onsettings} disabled={busy}>Change in Settings</button>
+        {/if}
+      </p>
     </fieldset>
 
     {#if error || (problem && shifts.length)}
@@ -234,7 +262,7 @@
       <span class="grow"></span>
       {#if !filedView}
         <!-- svelte-ignore a11y_autofocus -->
-        <button class="btn primary" type="submit" disabled={busy || !!problem} autofocus>{busy ? "Filing…" : "File CS/OB"}</button>
+        <button class="btn primary" type="submit" disabled={busy || !!problem} autofocus title="Ctrl+Enter">{busy ? "Filing…" : "File CS/OB"}</button>
       {/if}
       <!-- svelte-ignore a11y_autofocus -->
       <button type="button" class="btn" onclick={onclose} disabled={busy} autofocus={filedView}>{filedView ? "Close" : "Cancel"}</button>
@@ -279,7 +307,7 @@
     gap: 14px;
   }
   h2 {
-    font-size: 26px;
+    font-size: 24px;
   }
   .note {
     color: var(--on-canvas-muted);
@@ -303,8 +331,23 @@
     grid-column: 1 / -1;
     padding: 0;
   }
-  fieldset label {
+  fieldset label,
+  .label {
     font-weight: 600;
+  }
+  .customer {
+    overflow-wrap: anywhere;
+  }
+  .customer .link {
+    padding: 0 2px;
+  }
+  .own {
+    padding: 1px 6px;
+    border: var(--line);
+    border-radius: var(--r-pill);
+    background: var(--lemon);
+    box-shadow: var(--shadow-1);
+    margin-right: 4px; /* clear of its hard shadow */
   }
   .times {
     display: flex;

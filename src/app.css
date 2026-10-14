@@ -162,8 +162,13 @@ p {
 }
 
 kbd {
-  font: inherit;
-  text-decoration: underline;
+  display: inline-block;
+  padding: 0 6px;
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  font: 800 12px/1.5 var(--font);
 }
 
 /* ---- containers and stickers ---- */
@@ -246,7 +251,8 @@ input:disabled {
   color: var(--text-muted);
   border-color: var(--text-muted);
 }
-input[aria-invalid="true"] {
+/* while focused, the indigo ring wins; the red comes back when you leave the field */
+:is(input:not([type="checkbox"]), select, textarea)[aria-invalid="true"]:not(:focus) {
   border-color: var(--danger-line);
   box-shadow: 0 0 0 1px var(--danger-line);
 }

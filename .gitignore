@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Design tooling output (review captures, briefs, inspector reports): not needed to build or run
+.impeccable/
+.taste-skill/
+PRODUCT.md
+docs/assets/*.json
+.claude/

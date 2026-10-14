@@ -100,6 +100,12 @@ async fn shifts_for(nbs: State<'_, Nbs>, date: String) -> Res<Vec<ShiftOption>> 
         .collect())
 }
 
+/// Customer names for the Settings suggestions.
+#[tauri::command]
+async fn customers(nbs: State<'_, Nbs>) -> Res<Vec<String>> {
+    Ok(nbs.customers().await?.into_iter().map(|c| c.customer_name.trim().to_string()).collect())
+}
+
 #[tauri::command]
 async fn file_day(nbs: State<'_, Nbs>, request: FileRequest) -> Res<FileOutcome> {
     nbs.file_day(&request).await
@@ -122,6 +128,7 @@ pub fn run() {
             profile,
             load_period,
             shifts_for,
+            customers,
             file_day,
             delete_filings
         ])

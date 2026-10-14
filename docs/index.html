@@ -4,133 +4,587 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NBSBuddy</title>
-  <meta name="description" content="File your OB + Change Shift in NBS in a couple of clicks and see which days need action before payroll cutoff.">
+  <meta name="description" content="File your work-from-home OB and Change Shift in NBS in a couple of clicks, and see which days need action before payroll cutoff.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
   <style>
+    /* Sticker Board, the app's own system (DESIGN.md): ink outlines, hard ink shadows, lilac canvas, lemon action. */
     :root {
-      --ink: #111; --canvas: #cbbcff; --surface: #fff; --on-canvas-muted: #3a3159; --text-muted: #5b5275;
+      --ink: #111111; --canvas: #cbbcff; --surface: #ffffff; --surface-alt: #ebe4ff; --hover: #f3efff;
+      --text-muted: #5b5275; --on-canvas-muted: #3a3159;
       --lemon: #ffe14d; --lemon-hover: #ffd426; --mint: #5ee3a1; --tomato: #ff5a4e; --accent: #3d2bff;
       --line: 2px solid var(--ink);
+      --shadow-1: 2px 2px 0 var(--ink); --shadow-2: 3px 3px 0 var(--ink); --shadow-3: 4px 4px 0 var(--ink); --shadow-4: 5px 5px 0 var(--ink);
+      --r-pill: 6px; --r-tile: 7px; --r-control: 8px; --r-container: 12px;
+      --gutter: clamp(16px, 3vw, 40px);
+      --max: 1280px;
+      --land: cubic-bezier(.34, 1.56, .64, 1); /* weighted overshoot: things land on the board */
+      --out: cubic-bezier(.16, 1, .3, 1);
       color-scheme: light;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 17px/1.5 Archivo, "Segoe UI", sans-serif; }
-    main { max-width: 980px; margin: 0 auto; padding: 48px 16px 64px; }
-    h1, h2, h3, p { margin: 0; }
-    .display { font-weight: 900; font-stretch: 125%; letter-spacing: -0.01em; line-height: 1.02; }
-    a { color: inherit; }
-    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 18px/1.55 Archivo, "Segoe UI", sans-serif; }
+    h1, h2, h3, p, ol, ul, figure { margin: 0; }
+    a { color: inherit; text-underline-offset: 3px; }
+    img { display: block; max-width: 100%; height: auto; }
+    ::selection { background: #d9d2ff; color: var(--ink); }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .display { font-weight: 900; font-stretch: 125%; letter-spacing: -0.03em; line-height: 0.98; text-wrap: balance; }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); }
+    .sticker { border: var(--line); border-radius: var(--r-container); background: var(--surface); box-shadow: var(--shadow-4); }
 
-    .hero { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
-    .hero svg { width: 140px; height: 140px; }
-    .hero h1 { font-size: clamp(44px, 9vw, 84px); }
-    .tagline { margin-top: 12px; font-size: 20px; font-weight: 600; max-width: 34ch; }
-
-    .get { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: center; }
-    .download {
-      display: inline-flex; align-items: center; gap: 12px; padding: 16px 26px;
-      border: var(--line); border-radius: 12px; background: var(--lemon); box-shadow: 5px 5px 0 var(--ink);
-      font-weight: 900; font-stretch: 112%; font-size: 22px; text-decoration: none;
+    /* ---- buttons: lift on hover, drop onto the shadow when pressed (the app's own press) ---- */
+    .btn {
+      display: inline-flex; align-items: center; gap: 12px; padding: 15px 24px;
+      border: var(--line); border-radius: var(--r-container); background: var(--lemon); box-shadow: var(--shadow-4);
+      color: var(--ink); font: 900 21px/1.1 Archivo, sans-serif; font-stretch: 112%; text-decoration: none; white-space: nowrap;
+      transition: transform .18s var(--out), box-shadow .18s var(--out), background-color .18s;
     }
-    .download:hover { background: var(--lemon-hover); }
-    .download:active { transform: translate(5px, 5px); box-shadow: none; }
-    .meta { color: var(--on-canvas-muted); font-weight: 600; }
+    .btn:hover { background: var(--lemon-hover); transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+    .btn:active { transform: translate(5px, 5px); box-shadow: none; transition-duration: 0s; }
+    .btn svg { flex: none; }
+    .btn.small { padding: 9px 16px; font-size: 15px; box-shadow: var(--shadow-2); border-radius: var(--r-control); }
+    .btn.small:hover { box-shadow: 5px 5px 0 var(--ink); }
+    .btn.small:active { transform: translate(3px, 3px); box-shadow: none; }
+    .meta { color: var(--on-canvas-muted); font-weight: 600; font-size: 15px; }
 
-    .cards { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .card { padding: 20px; border: var(--line); border-radius: 12px; background: var(--surface); box-shadow: 5px 5px 0 var(--ink); }
-    .card h3 { font-size: 20px; font-weight: 900; margin: 12px 0 6px; }
-    .tag { display: inline-block; padding: 1px 10px; border: var(--line); border-radius: 6px; box-shadow: 2px 2px 0 var(--ink);
-      font-size: 13px; font-weight: 800; }
-    .mint { background: var(--mint); } .lemon { background: var(--lemon); } .tomato { background: var(--tomato); }
+    /* ---- nav ---- */
+    .nav { display: flex; align-items: center; gap: clamp(14px, 2.4vw, 32px); padding-top: 22px; padding-bottom: 22px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 900; font-stretch: 125%; font-size: 21px; text-decoration: none; letter-spacing: -0.02em; }
+    .nav .links { display: flex; gap: clamp(14px, 2.2vw, 28px); font-weight: 700; font-size: 15px; }
+    .nav .links a { position: relative; text-decoration: none; padding: 4px 0; }
+    .nav .links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink); transform: scaleX(0); transform-origin: left; transition: transform .25s var(--out); }
+    .nav .links a:hover::after { transform: none; }
+    .nav .grow { flex: 1; }
 
-    .install { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-    .install h2 { font-size: 32px; grid-column: 1 / -1; }
-    ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
-    .note { padding: 16px 18px; border: var(--line); border-radius: 12px; background: var(--lemon); }
-    .note strong { display: block; margin-bottom: 4px; }
+    /* ---- Buddy: blinks, and its eyes follow you ---- */
+    .buddy { display: block; overflow: visible; }
+    .buddy .eyes { transform-box: fill-box; transform-origin: center; animation: blink 5.2s infinite; }
+    .buddy .look { transition: transform .35s var(--out); }
+    @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
 
-    footer { margin-top: 56px; padding-top: 10px; border-top: var(--line); color: var(--on-canvas-muted); font-weight: 600; font-size: 15px; }
+    /* ---- hero ---- */
+    .hero { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(24px, 4vw, 64px); align-items: center; padding-top: clamp(16px, 3vw, 40px); padding-bottom: clamp(56px, 8vw, 120px); }
+    .hero .mascot { width: min(100%, 470px); justify-self: center; transform: rotate(-6deg); }
+    .bubble { position: relative; padding: clamp(26px, 3.4vw, 46px); }
+    .bubble::before {
+      content: ""; position: absolute; left: -17px; top: 38%; width: 30px; height: 30px; background: var(--surface);
+      border-left: var(--line); border-bottom: var(--line); transform: rotate(45deg);
+    }
+    .hero h1 { font-size: clamp(42px, 5.4vw, 78px); }
+    .hero .lede { margin: clamp(16px, 2vw, 24px) 0 clamp(22px, 2.6vw, 32px); font-size: 21px; max-width: 38ch; }
+    .get { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; }
 
-    @media (max-width: 760px) {
-      main { padding-top: 28px; }
-      .hero { grid-template-columns: 1fr; gap: 16px; }
-      .hero svg { width: 96px; height: 96px; }
-      .cards, .install { grid-template-columns: 1fr; }
+    /* today's real payroll period, the app's own day tiles */
+    .now { margin-top: clamp(26px, 3vw, 40px); display: grid; gap: 14px; }
+    .now .say { font-weight: 800; font-size: 18px; min-height: 1.55em; }
+    .rail { display: flex; gap: 6px; padding-bottom: 20px; }
+    .tile {
+      position: relative; flex: 1 1 0; max-width: 46px; min-width: 0; height: 56px; padding: 0; border: var(--line); border-radius: var(--r-tile);
+      background: var(--surface); box-shadow: var(--shadow-1); color: var(--ink); font: 800 18px Archivo, sans-serif; cursor: pointer;
+      transition: transform .15s var(--out);
+    }
+    .tile:hover { transform: translateY(-3px); }
+    .tile.done { background: var(--mint); }
+    .tile.wait { background: var(--surface); }
+    .tile.due { background: var(--lemon); }
+    .tile.act { background: var(--tomato); border-width: 3px; }
+    .tile.up { border-style: dashed; background: transparent; box-shadow: none; }
+    .tile.today { border-width: 4px; }
+    .tile[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .tile i { position: absolute; right: -4px; top: calc(100% + 6px); padding: 1px 5px; border-radius: 3px; background: var(--ink); color: var(--lemon); font: 900 11px Archivo, sans-serif; font-style: normal; letter-spacing: 0.05em; }
+
+    /* ---- the tour: the coworker's question, Buddy's answer in a bubble, the real app ---- */
+    section.q { padding-top: clamp(80px, 11vw, 170px); padding-bottom: clamp(80px, 11vw, 170px); }
+    .q h2 { font-size: clamp(42px, 5.4vw, 78px); }
+    .note { color: var(--on-canvas-muted); font-size: 15px; font-weight: 600; }
+    .shot { border: var(--line); border-radius: var(--r-container); box-shadow: var(--shadow-4); overflow: hidden; background: var(--surface); }
+    /* Buddy speaks: a small tilted Buddy and a bubble whose tail points at it */
+    .says { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: center; }
+    .says .mini { width: clamp(72px, 7vw, 104px); rotate: -6deg; }
+    .says .bubble { padding: clamp(20px, 2.4vw, 30px); }
+    .says .bubble > p { font-size: 21px; line-height: 1.5; }
+
+    /* what you get: the question beside Buddy's answer, then the board with the four stickers pinned on it */
+    .what .head { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 32px 56px; align-items: center; margin-bottom: clamp(36px, 5vw, 64px); }
+    .what .stage { position: relative; }
+    .what .shot { transform-origin: 50% 0; }
+    .pins { list-style: none; padding: 0; }
+    .pin {
+      position: absolute; display: grid; gap: 4px; width: min(250px, 30%); padding: 12px 14px; border: var(--line); border-radius: var(--r-container);
+      background: var(--surface); box-shadow: var(--shadow-3); font-size: 15px; line-height: 1.35;
+    }
+    .pin b { justify-self: start; padding: 2px 10px; border: var(--line); border-radius: var(--r-pill); box-shadow: var(--shadow-1); font-weight: 800; font-size: 15px; }
+    .pin.done b { background: var(--mint); } .pin.due b { background: var(--lemon); } .pin.act b { background: var(--tomato); border-width: 3px; }
+    .pin:nth-child(1) { left: -2%; top: 33%; rotate: -3deg; }
+    .pin:nth-child(2) { right: -2%; top: 52%; rotate: 2.5deg; }
+    .pin:nth-child(3) { left: 8%; top: 70%; rotate: 2deg; }
+    .pin:nth-child(4) { right: 6%; top: 86%; rotate: -2deg; }
+    .what .note { margin-top: 26px; }
+
+    /* how fast: Buddy's answer is stuck onto the dialog itself */
+    .fast { background: var(--surface-alt); }
+    .fast .stage { margin-top: clamp(36px, 5vw, 64px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); align-items: center; }
+    .fast .shot { grid-area: 1 / 1; rotate: -1.5deg; }
+    .fast .says { grid-area: 1 / 2; position: relative; z-index: 1; margin-left: -14%; }
+    .clicks { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; list-style: none; padding: 0; }
+    .clicks li { padding: 10px 16px; border: var(--line); border-radius: var(--r-container); background: var(--surface); box-shadow: var(--shadow-3); font-weight: 800; }
+    .clicks li:nth-child(2) { background: var(--lemon); }
+    .oops { margin: clamp(28px, 4vw, 48px) 0 0 auto; padding: 16px 18px; max-width: 46ch; border: var(--line); border-radius: var(--r-container); background: var(--surface); box-shadow: var(--shadow-3); font-size: 18px; rotate: 1deg; }
+    .oops b { display: block; }
+
+    /* defaults: the question and Buddy's answer, the Settings dialog, and the three header buttons in a row */
+    .defaults .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+    .defaults .col { display: grid; gap: clamp(28px, 3vw, 40px); }
+    .defaults .shot { rotate: 1.5deg; }
+    .keys { grid-column: 1 / -1; margin-top: clamp(16px, 3vw, 40px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; list-style: none; padding: 0; }
+    .keys li { display: flex; align-items: center; gap: 16px; font-weight: 600; font-size: 18px; }
+    .icon {
+      flex: none; display: grid; place-items: center; width: 56px; height: 56px; border: var(--line); border-radius: var(--r-control);
+      background: var(--surface); box-shadow: var(--shadow-2); transition: transform .15s var(--out), box-shadow .15s var(--out);
+    }
+    .keys li:hover .icon { transform: translate(3px, 3px); box-shadow: none; }
+    .icon.plus { background: var(--lemon); }
+    kbd { display: inline-block; padding: 0 7px; border: var(--line); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-1); font: 800 15px Archivo, sans-serif; }
+
+    /* safe: a white field; every claim links to the code that proves it */
+    .safe { background: var(--surface); }
+    .safe .top { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 32px 56px; align-items: center; margin-bottom: clamp(44px, 6vw, 80px); }
+    .safe .grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(32px, 5vw, 80px); align-items: start; }
+    .safe .shot { rotate: -1.5deg; max-width: 460px; }
+    .claims { list-style: none; padding: 0; display: grid; gap: clamp(32px, 4vw, 48px); }
+    .claim { max-width: 660px; }
+    .claim h3 { font-size: 28px; font-weight: 900; font-stretch: 112%; line-height: 1.12; letter-spacing: -0.015em; }
+    .claim p { margin-top: 10px; font-size: 18px; }
+    .claim a { display: inline-block; margin-top: 12px; font-weight: 800; font-size: 15px; }
+
+    /* install: three steps stuck to the board, then Buddy walks you past SmartScreen */
+    .install { background: var(--surface-alt); }
+    .install h2 { margin-bottom: clamp(36px, 5vw, 64px); }
+    .steps { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 32px); padding: 0; list-style: none; align-items: start; }
+    .step { padding: 24px 22px; border: var(--line); border-radius: var(--r-container); background: var(--surface); box-shadow: var(--shadow-4); font-size: 18px; }
+    .step:nth-child(2) { margin-top: 34px; } .step:nth-child(3) { margin-top: 12px; }
+    .step:first-child { background: var(--lemon); }
+    .step:nth-child(1) { rotate: -1.5deg; } .step:nth-child(2) { rotate: 1deg; } .step:nth-child(3) { rotate: -0.8deg; }
+    .step b { display: block; font-size: 21px; font-stretch: 112%; margin-bottom: 6px; }
+    .smart { margin-top: clamp(48px, 7vw, 96px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
+    .smart h3 { font-size: 28px; font-weight: 900; font-stretch: 112%; line-height: 1.12; letter-spacing: -0.015em; }
+    .smart .bubble p { margin-top: 10px; font-size: 18px; }
+    /* a drawing of the Windows prompt, so people recognise it; not a screenshot */
+    .ss { font-family: "Segoe UI", system-ui, sans-serif; background: #0067c0; color: #fff; padding: 28px 30px 22px; border: var(--line); border-radius: 8px; box-shadow: var(--shadow-4); max-width: 520px; }
+    .ss strong { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; }
+    .ss p { margin-top: 12px; font-size: 15px; max-width: none; }
+    .ss .more { display: inline-block; margin-top: 10px; font-size: 15px; text-decoration: underline; position: relative; }
+    .ss .row { margin-top: 26px; display: flex; justify-content: flex-end; gap: 10px; }
+    .ss .row span { padding: 6px 18px; border: 1px solid #fff; font-size: 15px; position: relative; }
+    .ss .ring { position: absolute; inset: -9px -12px; border: 3px solid var(--lemon); border-radius: var(--r-container); }
+
+    /* close: Buddy says the last line */
+    .close { padding-top: clamp(80px, 11vw, 170px); }
+    .close .grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(28px, 4vw, 64px); align-items: center; }
+    .close .mascot { width: clamp(140px, 17vw, 240px); transform: rotate(-4deg); }
+    .close .bubble { justify-self: start; }
+    .close h2 { font-size: clamp(42px, 5.4vw, 78px); margin-bottom: 26px; }
+    footer { margin-top: clamp(80px, 10vw, 150px); overflow: hidden; }
+    .word { font-weight: 900; font-stretch: 125%; letter-spacing: -0.04em; line-height: 0.8; font-size: min(13.2vw, 196px); white-space: nowrap; margin-bottom: -0.06em; }
+    .credits { display: flex; flex-wrap: wrap; gap: 8px 22px; padding-top: 18px; padding-bottom: 28px; font-weight: 600; font-size: 15px; color: var(--on-canvas-muted); }
+
+    /* ---- motion: one grammar. Stickers are slapped on, the day row lands on a downbeat, the board drifts. ---- */
+    /* the signature move: a sticker is slapped onto the board, lifted first, then pressed onto its shadow */
+    .js [data-slap] { opacity: 0; }
+    .js [data-slap].in { animation: slap .62s var(--land) both; animation-delay: calc(var(--i, 0) * 110ms); }
+    /* the headline and Download button never wait on the script */
+    .hero .lead { animation: slap .62s var(--land) .1s both; }
+    @keyframes slap {
+      0% { opacity: 0; transform: translate(-16px, -20px) scale(1.06); box-shadow: 21px 25px 0 rgba(17, 17, 17, 0); }
+      35% { opacity: 1; }
+      100% { opacity: 1; transform: none; }
+    }
+    /* the day row: every tile lands on one downbeat, each with its own weight (the meter bridge) */
+    .js .rail .tile { opacity: 0; }
+    .js .rail.go .tile { animation: beat .8s var(--land) both; animation-delay: calc(var(--w, 0) * 1ms); }
+    @keyframes beat { 0% { opacity: 0; transform: translateY(-34px) rotate(-8deg); } 30% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+    .tile:active { transform: translate(2px, 2px); box-shadow: none; transition-duration: 0s; }
+    /* the board drifts as you scroll past it, where the browser can tie motion to scroll */
+    @supports (animation-timeline: view()) {
+      .what .shot { animation: drift linear both; animation-timeline: view(); animation-range: entry 0% cover 60%; }
+      @keyframes drift { from { transform: perspective(1400px) rotateX(9deg) scale(0.94); } to { transform: none; } }
+    }
+    /* SmartScreen: More info, then Run anyway, circled in turn */
+    .js .ss .ring { opacity: 0; }
+    .js .ss.in .ring { animation: ring 1.2s var(--out) .5s both; }
+    .js .ss.in .ring.next { animation-delay: 1.5s; }
+    @keyframes ring { 0% { opacity: 0; transform: scale(1.35); } 40% { opacity: 1; transform: none; } 100% { opacity: 1; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition-duration: 0s !important; }
+      .js [data-slap], .js .rail .tile, .js .ss .ring { opacity: 1; transform: none; }
+      .buddy .look { transform: none !important; }
+    }
+
+    /* ---- phone and tablet: each section recomposed, not squeezed ---- */
+    @media (max-width: 900px) {
+      .nav .links { display: none; }
+      .hero { grid-template-columns: minmax(0, 1fr); }
+      .hero .mascot { width: 170px; justify-self: start; margin-left: 6px; }
+      .bubble::before { left: 54px; top: -17px; border-left: var(--line); border-bottom: 0; border-top: var(--line); }
+      .what .head, .defaults .grid, .safe .top, .safe .grid, .smart, .close .grid, .steps, .keys { grid-template-columns: minmax(0, 1fr); }
+      .fast .stage { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+      .fast .shot, .fast .says { grid-area: auto; margin-left: 0; }
+      .step:nth-child(n) { margin-top: 0; }
+      .keys { margin-top: 0; }
+      .says { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+      .says .mini { width: 64px; margin-left: 12px; }
+      .says .bubble::before { left: 30px; top: -17px; border-left: var(--line); border-bottom: 0; border-top: var(--line); }
+      .close .bubble::before { left: 54px; top: -17px; border-left: var(--line); border-bottom: 0; border-top: var(--line); }
+      .pin { position: static; width: auto; rotate: 0deg !important; padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+      .pins { display: grid; gap: 12px; margin-top: 22px; }
+      .close .mascot { width: 130px; }
+    }
+    @media (max-width: 520px) {
+      .rail { gap: 3px; padding-right: 4px; }
+      .tile { height: 46px; font-size: 15px; }
+      .btn { padding: 14px 20px; font-size: 18px; }
+      .hero .lede, .says .bubble > p { font-size: 18px; }
+      .claim h3, .smart h3 { font-size: 21px; }
+      .close .bubble { justify-self: stretch; }
+      .close .btn { width: 100%; white-space: normal; }
     }
   </style>
 </head>
 <body>
-<main>
-  <section class="hero">
-    <svg viewBox="0 0 1024 1024" aria-hidden="true">
-      <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
-      <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="48"/>
-      <circle cx="350" cy="410" r="66" fill="#111"/><circle cx="618" cy="410" r="66" fill="#111"/>
-      <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="60" stroke-linecap="round"/>
-    </svg>
-    <div>
-      <h1 class="display">NBSBuddy</h1>
-      <p class="tagline">File your work-from-home OB + Change Shift in NBS in a couple of clicks, and see which days need action before payroll cutoff.</p>
-    </div>
-  </section>
+  <script>document.documentElement.classList.add("js");</script>
 
-  <div class="get">
-    <a class="download" href="https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/NBSBuddy-setup.exe">
-      <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-4-4 4 4 4-4M3 14h10" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Download for Windows
+  <header class="wrap nav">
+    <a class="brand" href="#top" aria-label="NBSBuddy, back to top">
+      <svg width="30" height="30" viewBox="0 0 1024 1024" aria-hidden="true"><rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/><rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="64"/><circle cx="350" cy="410" r="72" fill="#111"/><circle cx="618" cy="410" r="72" fill="#111"/><path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="70" stroke-linecap="round"/></svg>
+      NBSBuddy
     </a>
-    <p class="meta"><span id="version">Latest version</span> · Windows 10 / 11 · needs ZeroTier and your NBS account</p>
-  </div>
+    <nav class="links" aria-label="On this page">
+      <a href="#what">What you get</a>
+      <a href="#safe">Is it safe?</a>
+      <a href="#install">Install</a>
+    </nav>
+    <span class="grow"></span>
+    <a class="btn small" href="https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/NBSBuddy-setup.exe">Download</a>
+  </header>
 
-  <section class="cards">
-    <div class="card">
-      <span class="tag lemon">File CS/OB</span>
-      <h3>Two clicks a day</h3>
-      <p>Pick your shift; NBSBuddy fills in the OB times and files OB and CS together, skipping whatever's already in NBS.</p>
-    </div>
-    <div class="card">
-      <span class="tag mint">Done</span> <span class="tag tomato">Needs action</span>
-      <h3>Cutoff at a glance</h3>
-      <p>Every workday of the payroll period gets one sticker, so missing, disapproved or late days jump out before cutoff.</p>
-    </div>
-    <div class="card">
-      <span class="tag">For Approval</span>
-      <h3>Undo a mistake</h3>
-      <p>Filed the wrong shift? Delete a filing while it's still For Approval, then file the day again.</p>
-    </div>
-  </section>
+  <main id="top">
+    <section class="wrap hero" aria-labelledby="hero-title">
+      <svg class="buddy mascot" viewBox="0 0 1024 1024" aria-hidden="true">
+        <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+        <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="40"/>
+        <g class="look"><g class="eyes"><circle cx="350" cy="410" r="66" fill="#111"/><circle cx="618" cy="410" r="66" fill="#111"/></g></g>
+        <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="56" stroke-linecap="round"/>
+      </svg>
 
-  <section class="install">
-    <h2 class="display">Install</h2>
-    <ol>
-      <li>Click <b>Download for Windows</b> and run <code>NBSBuddy-setup.exe</code>. No admin rights needed.</li>
-      <li>Connect <b>ZeroTier</b>. NBS is only reachable on the company network.</li>
-      <li>Open NBSBuddy and sign in with your NBS username and password. Tick <b>Remember me</b> to skip sign-in next time.</li>
-    </ol>
-    <div class="note">
-      <strong>"Windows protected your PC"?</strong>
-      The installer isn't code-signed yet, so Windows SmartScreen asks first. Click <b>More info</b>, then <b>Run anyway</b>.
-    </div>
-  </section>
+      <div>
+        <div class="sticker bubble lead">
+          <h1 id="hero-title" class="display">I file your OB and&nbsp;CS.</h1>
+          <p class="lede">Pick your shift and I file both in NBS, then show every workday of your payroll period as a sticker, so nothing slips past cutoff.</p>
+          <div class="get">
+            <a class="btn" href="https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/NBSBuddy-setup.exe">
+              <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-4-4 4 4 4-4M3 14h10" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Download for Windows
+            </a>
+            <p class="meta"><span class="version">Latest version</span> · Windows 10 and 11</p>
+          </div>
+        </div>
+
+        <div class="now">
+          <p class="say" id="say" aria-live="polite">Every workday of the payroll period gets one sticker, and cutoff is its last workday.</p>
+          <!-- today's real period, drawn by the script below; without script the line above says it in words -->
+          <div class="rail" id="rail" data-ui role="group" aria-label="This payroll period's workdays" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="q what" id="what" aria-labelledby="what-title">
+      <div class="wrap">
+        <div class="head">
+          <h2 id="what-title" class="display">What do I get?</h2>
+          <div class="says">
+            <svg class="buddy mini" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+            <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="56"/>
+            <g class="look"><g class="eyes"><circle cx="350" cy="410" r="70" fill="#111"/><circle cx="618" cy="410" r="70" fill="#111"/></g></g>
+            <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="64" stroke-linecap="round"/>
+          </svg>
+            <div class="sticker bubble" data-slap><p>One board for the whole payroll period, 1–15 or 16 to the end of the month. Every workday wears one sticker, and the red one is what to fix before cutoff.</p></div>
+          </div>
+        </div>
+        <div class="stage">
+          <figure class="shot">
+            <img src="assets/board.webp" width="2266" height="1556" alt="The NBSBuddy board for Oct 1–15, 2026 with sample data: a red headline reads 1 day needs action, a row of day tiles ends in a CUTOFF tag, and the table lists each day with its sticker, OB time, hours, shift, note and reasons.">
+          </figure>
+          <ul class="pins">
+            <li class="pin done" data-slap style="--i:1"><b>Done</b>OB and CS are both approved.</li>
+            <li class="pin" data-slap style="--i:2"><b>Waiting</b>Filed, waiting for approval.</li>
+            <li class="pin act" data-slap style="--i:3"><b>Needs action</b>Missing, disapproved, or the times don't match the shift.</li>
+            <li class="pin due" data-slap style="--i:4"><b>Due today</b>Today isn't fully filed yet.</li>
+          </ul>
+        </div>
+        <p class="note">Sample data. Your board shows your own NBS filings.</p>
+      </div>
+    </section>
+
+    <section class="q fast" aria-labelledby="fast-title">
+      <div class="wrap">
+        <h2 id="fast-title" class="display">How fast is filing?</h2>
+        <div class="stage">
+          <figure class="shot">
+            <img src="assets/file.webp" width="1176" height="1089" alt="The File CS/OB dialog with sample data: date 10/14/2026, the shift CW 9.5H 730AM-530PM SP 30MIN BRK, OB time 07:30 AM to 05:30 PM, 10 hours." loading="lazy">
+          </figure>
+          <div class="says">
+            <svg class="buddy mini" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+            <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="56"/>
+            <g class="look"><g class="eyes"><circle cx="350" cy="410" r="70" fill="#111"/><circle cx="618" cy="410" r="70" fill="#111"/></g></g>
+            <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="64" stroke-linecap="round"/>
+          </svg>
+            <div class="sticker bubble" data-slap>
+              <p>Two clicks. The OB times and hours come from your shift, and I file OB and CS together, skipping whatever NBS already has.</p>
+              <ol class="clicks">
+                <li data-slap style="--i:3">Pick your shift</li>
+                <li data-slap style="--i:4">Press File CS/OB</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <p class="oops" data-slap style="--i:2"><b>Filed the wrong shift?</b>Delete it while it's still For Approval, then file the day again.</p>
+      </div>
+    </section>
+
+    <section class="q defaults" aria-labelledby="defaults-title">
+      <div class="wrap grid">
+        <div class="col">
+          <h2 id="defaults-title" class="display">Set it up once.</h2>
+          <div class="says">
+            <svg class="buddy mini" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+            <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="56"/>
+            <g class="look"><g class="eyes"><circle cx="350" cy="410" r="70" fill="#111"/><circle cx="618" cy="410" r="70" fill="#111"/></g></g>
+            <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="64" stroke-linecap="round"/>
+          </svg>
+            <div class="sticker bubble" data-slap><p>Your usual OB reason, CS reason and NBS customer live in Settings, saved on this PC. You can still change the reasons for a single filing.</p></div>
+          </div>
+        </div>
+        <figure class="shot">
+          <img src="assets/settings.webp" width="1176" height="820" alt="The Settings dialog: OB reason Work from home, CS reason WFH, and the customer 315 CORPORATE OFFICE picked from NBS's list." loading="lazy">
+        </figure>
+        <ul class="keys">
+          <li data-slap style="--i:1"><span class="icon plus" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 4.5v15M4.5 12h15" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round"/></svg></span><span>File today with <kbd>Ctrl</kbd> + <kbd>N</kbd>, or double-click any day.</span></li>
+          <li data-slap style="--i:2"><span class="icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><g fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17.82 16.89A7.6 7.6 0 1 1 15.80 5.42"/><path d="M15.42 1.64L16.84 6.02L12.34 6.97"/></g></svg></span><span>Reload the period from NBS with <kbd>F5</kbd>.</span></li>
+          <li data-slap style="--i:3"><span class="icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><g fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.87 5.02L10.09 2.18A10 10 0 0 1 13.91 2.18L14.13 5.02A7.3 7.3 0 0 1 16.98 6.66L19.55 5.44A10 10 0 0 1 21.46 8.74L19.11 10.36A7.3 7.3 0 0 1 19.11 13.64L21.46 15.26A10 10 0 0 1 19.55 18.56L16.98 17.34A7.3 7.3 0 0 1 14.13 18.98L13.91 21.82A10 10 0 0 1 10.09 21.82L9.87 18.98A7.3 7.3 0 0 1 7.02 17.34L4.45 18.56A10 10 0 0 1 2.54 15.26L4.89 13.64A7.3 7.3 0 0 1 4.89 10.36L2.54 8.74A10 10 0 0 1 4.45 5.44L7.02 6.66A7.3 7.3 0 0 1 9.87 5.02Z"/><circle cx="12" cy="12" r="3"/></g></svg></span><span>Open Settings with <kbd>Ctrl</kbd> + <kbd>,</kbd>.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="q safe" id="safe" aria-labelledby="safe-title">
+      <div class="wrap">
+        <div class="top">
+          <h2 id="safe-title" class="display">Is my login safe?</h2>
+          <div class="says">
+            <svg class="buddy mini" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+            <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="56"/>
+            <g class="look"><g class="eyes"><circle cx="350" cy="410" r="70" fill="#111"/><circle cx="618" cy="410" r="70" fill="#111"/></g></g>
+            <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="64" stroke-linecap="round"/>
+          </svg>
+            <div class="sticker bubble" data-slap><p>Fair question. Here's what happens to your password, and where to check every word in the code.</p></div>
+          </div>
+        </div>
+        <div class="grid">
+          <figure class="shot">
+            <img src="assets/login.webp" width="929" height="870" alt="The NBSBuddy sign-in screen: username, password, a ticked Remember me on this PC box, the Sign in button, and the line: Your password is only sent to NBS and kept in Windows Credential Manager." loading="lazy">
+          </figure>
+          <ul class="claims">
+            <li class="claim">
+              <h3>Your password goes to NBS and nowhere else.</h3>
+              <p>Every request goes to NBS's own address on the company network. There is no other server.</p>
+              <a href="https://github.com/JobertQDomingo/NBSBuddy/blob/main/src-tauri/src/nbs.rs">Read it in nbs.rs</a>
+            </li>
+            <li class="claim">
+              <h3>Remember me uses Windows Credential Manager.</h3>
+              <p>Your password is kept there, encrypted for your Windows account, and NBSBuddy never writes it anywhere else. Log out forgets it. Your username and filing defaults are saved on this PC.</p>
+              <a href="https://github.com/JobertQDomingo/NBSBuddy/blob/main/src-tauri/src/creds.rs">Read it in creds.rs</a>
+            </li>
+            <li class="claim">
+              <h3>The window you click can't reach the internet.</h3>
+              <p>The screen only talks to the app's own core, and only the core talks to NBS.</p>
+              <a href="https://github.com/JobertQDomingo/NBSBuddy/blob/main/src-tauri/tauri.conf.json">Read it in tauri.conf.json</a>
+            </li>
+            <li class="claim">
+              <h3>It's unofficial, and all of it is public.</h3>
+              <p>A colleague made it, not IT or the NBS vendor. The installer isn't code-signed yet, and every line it's built from is on GitHub.</p>
+              <a href="https://github.com/JobertQDomingo/NBSBuddy">See the source on GitHub</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="q install" id="install" aria-labelledby="install-title">
+      <div class="wrap">
+        <h2 id="install-title" class="display">How do I install it?</h2>
+        <ol class="steps">
+          <li class="step" data-slap style="--i:1"><b>Download and run it.</b>Run <strong>NBSBuddy-setup.exe</strong>. No admin rights needed.</li>
+          <li class="step" data-slap style="--i:2"><b>Connect ZeroTier.</b>NBS only answers on the company network, so keep ZeroTier on whenever you use NBSBuddy.</li>
+          <li class="step" data-slap style="--i:3"><b>Sign in.</b>Use your NBS username and password. Tick Remember me to skip this next time.</li>
+        </ol>
+        <div class="smart">
+          <div class="says">
+            <svg class="buddy mini" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+            <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="56"/>
+            <g class="look"><g class="eyes"><circle cx="350" cy="410" r="70" fill="#111"/><circle cx="618" cy="410" r="70" fill="#111"/></g></g>
+            <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="64" stroke-linecap="round"/>
+          </svg>
+            <div class="sticker bubble" data-slap>
+              <h3>“Windows protected your PC”?</h3>
+              <p>The installer isn't code-signed yet, so SmartScreen asks first. Click <b>More info</b>, then <b>Run anyway</b>.</p>
+            </div>
+          </div>
+          <div class="ss" data-ui aria-label="A drawing of the SmartScreen prompt, with More info and then Run anyway circled" role="img">
+            <strong>Windows protected your PC</strong>
+            <p>Microsoft Defender SmartScreen prevented an unrecognized app from starting.</p>
+            <span class="more">More info<span class="ring"></span></span>
+            <div class="row"><span>Run anyway<span class="ring next"></span></span><span>Don't run</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="close" aria-labelledby="close-title">
+      <div class="wrap grid">
+        <svg class="buddy mascot" viewBox="0 0 1024 1024" aria-hidden="true">
+          <rect x="120" y="120" width="840" height="840" rx="180" fill="#111"/>
+          <rect x="64" y="64" width="840" height="840" rx="180" fill="#ffe14d" stroke="#111" stroke-width="40"/>
+          <g class="look"><g class="eyes"><circle cx="350" cy="410" r="66" fill="#111"/><circle cx="618" cy="410" r="66" fill="#111"/></g></g>
+          <path d="M300 580 Q484 760 668 580" fill="none" stroke="#111" stroke-width="56" stroke-linecap="round"/>
+        </svg>
+        <div class="sticker bubble" data-slap>
+          <h2 id="close-title" class="display">Beat the cutoff.</h2>
+          <a class="btn" href="https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/NBSBuddy-setup.exe">
+            <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-4-4 4 4 4-4M3 14h10" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Download for Windows
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
 
   <footer>
-    Made for the team by Jobert Domingo · <a href="https://github.com/JobertQDomingo/NBSBuddy">Source on GitHub</a> ·
-    <a href="https://github.com/JobertQDomingo/NBSBuddy/releases">All releases</a>
+    <div class="wrap">
+      <p class="word" aria-hidden="true">NBSBuddy</p>
+      <p class="credits">
+        <span>Made for the team by Jobert Domingo</span>
+        <a href="https://github.com/JobertQDomingo/NBSBuddy">Source on GitHub</a>
+        <a href="https://github.com/JobertQDomingo/NBSBuddy/releases">All releases</a>
+        <span>Screens show sample data.</span>
+      </p>
+    </div>
   </footer>
-</main>
-<script>
-  // Show the latest version next to the button; the page works fine without it.
-  fetch("https://api.github.com/repos/JobertQDomingo/NBSBuddy/releases/latest")
-    .then((r) => (r.ok ? r.json() : null))
-    .then((rel) => {
-      if (!rel) return;
-      const date = new Date(rel.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      document.getElementById("version").textContent = `${rel.tag_name} · ${date}`;
-    })
-    .catch(() => {});
-</script>
+
+  <script>
+    // Everything here is an enhancement: the page reads in full without it.
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Entrances: each sticker is slapped on once, as it arrives. Set up first, so nothing below can leave one hidden.
+    if (still) document.querySelectorAll("[data-slap],.ss").forEach((el) => el.classList.add("in"));
+    else {
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      }, { rootMargin: "0px 0px -12% 0px" });
+      document.querySelectorAll("[data-slap],.ss").forEach((el) => io.observe(el));
+      // At the very bottom nothing more can scroll into view, so whatever is still waiting arrives now.
+      const atEnd = () => {
+        if (innerHeight + scrollY < document.documentElement.scrollHeight - 4) return;
+        document.querySelectorAll("[data-slap]:not(.in),.ss:not(.in)").forEach((el) => el.classList.add("in"));
+        removeEventListener("scroll", atEnd);
+      };
+      addEventListener("scroll", atEnd, { passive: true });
+      addEventListener("load", atEnd);
+    }
+
+    // Today's real payroll period (1–15 or 16–end), drawn as the app draws its day tiles.
+    (function today() {
+      const rail = document.getElementById("rail"), say = document.getElementById("say");
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+      const last = new Date(y, m + 1, 0).getDate();
+      const [from, to] = d <= 15 ? [1, 15] : [16, last];
+      const days = [];
+      for (let n = from; n <= to; n++) { const t = new Date(y, m, n); if (t.getDay() % 6) days.push(t); }
+      const fmt = (t) => t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const cutoff = days[days.length - 1];
+      const left = days.filter((t) => t >= now).length;
+      const until = Math.round((cutoff - now) / 864e5); // calendar days to cutoff
+      const when =
+        until < 0 ? `Cutoff was ${fmt(cutoff)}.`
+        : until === 0 ? "Cutoff is today."
+        : until === 1 ? `Cutoff is tomorrow, ${fmt(cutoff)}.`
+        : `Cutoff is ${fmt(cutoff)}, ${left} workdays left.`;
+      const line = `Today is ${fmt(now)}. ${when}`;
+      const tip = (t) => {
+        if (+t === +now) return `${fmt(t)} is today. File it before you log off.`;
+        if (t < now) return `${fmt(t)} is past. If it isn't filed, it shows red on your board.`;
+        return `${fmt(t)} is coming up${+t === +cutoff ? ", and it's cutoff" : ""}.`;
+      };
+      rail.replaceChildren(...days.map((t, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "tile " + (+t === +now ? "due today" : t < now ? "wait" : "up");
+        b.textContent = t.getDate();
+        b.setAttribute("aria-label", tip(t));
+        b.setAttribute("aria-pressed", "false");
+        b.style.setProperty("--w", String(Math.round(Math.sin(i * 1.7) * 40 + 40))); // each tile its own weight
+        if (+t === +cutoff) { const tag = document.createElement("i"); tag.textContent = "CUTOFF"; b.append(tag); }
+        b.addEventListener("click", () => {
+          const on = b.getAttribute("aria-pressed") !== "true";
+          rail.querySelectorAll(".tile").forEach((x) => x.setAttribute("aria-pressed", "false"));
+          b.setAttribute("aria-pressed", String(on));
+          say.textContent = on ? tip(t) : line;
+        });
+        return b;
+      }));
+      say.textContent = line;
+      rail.hidden = false;
+      requestAnimationFrame(() => rail.classList.add("go"));
+    })();
+
+    // Buddy's eyes follow the pointer, a few pixels at most.
+    if (!still && matchMedia("(pointer: fine)").matches) {
+      const looks = [...document.querySelectorAll(".buddy .look")];
+      let raf = 0, px = 0, py = 0;
+      addEventListener("pointermove", (e) => {
+        px = e.clientX; py = e.clientY;
+        raf ||= requestAnimationFrame(() => {
+          raf = 0;
+          for (const g of looks) {
+            const r = g.ownerSVGElement.getBoundingClientRect();
+            const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height * 0.42);
+            const k = Math.min(1, Math.hypot(dx, dy) / 600);
+            const a = Math.atan2(dy, dx);
+            g.style.transform = `translate(${Math.cos(a) * 34 * k}px, ${Math.sin(a) * 26 * k}px)`;
+          }
+        });
+      }, { passive: true });
+    }
+
+    // The latest release's version next to every Download button; the page works fine without it.
+    fetch("https://api.github.com/repos/JobertQDomingo/NBSBuddy/releases/latest")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rel) => {
+        if (!rel) return;
+        const date = new Date(rel.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        document.querySelectorAll(".version").forEach((el) => (el.textContent = `${rel.tag_name} · ${date}`));
+      })
+      .catch(() => {});
+  </script>
 </body>
 </html>

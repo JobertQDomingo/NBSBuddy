@@ -7,7 +7,22 @@
     $props();
   let el: HTMLDialogElement;
 
-  onMount(() => el.showModal());
+  onMount(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    el.showModal();
+    // Ctrl+Enter submits the dialog's form from any field, even a multi-line reason.
+    el.addEventListener("keydown", (e) => {
+      const form = (e.target as HTMLElement).closest("form");
+      if (e.key !== "Enter" || !e.ctrlKey || !form) return;
+      e.preventDefault();
+      form.requestSubmit();
+    });
+    // {#if} removes the dialog without close(), which skips the browser's own focus return.
+    return () => {
+      el.close();
+      opener?.focus();
+    };
+  });
 </script>
 
 <dialog

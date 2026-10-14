@@ -254,6 +254,26 @@ pub struct FileRequest {
     pub time_out: String,
     pub ob_reason: String,
     pub cs_reason: String,
+    /// NBS customer the OB is filed against; blank means the built-in one.
+    #[serde(default)]
+    pub customer: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Customer {
+    #[serde(deserialize_with = "int")]
+    pub id: i64,
+    #[serde(deserialize_with = "text")]
+    pub customer_name: String,
+}
+
+/// The id of the customer named `name` (any case), or of the built-in one when blank.
+fn find_customer(all: &[Customer], name: &str) -> Res<i64> {
+    let name = Some(name.trim()).filter(|n| !n.is_empty()).unwrap_or(CUSTOMER);
+    all.iter()
+        .find(|c| c.customer_name.trim().eq_ignore_ascii_case(name))
+        .map(|c| c.id)
+        .ok_or_else(|| AppError::nbs(format!("NBS has no customer named {name}. Pick another one in Settings.")))
 }
 
 fn filings_query(from: &str, to: &str) -> String {
@@ -405,19 +425,8 @@ impl Nbs {
         Ok(list.swap_remove(0))
     }
 
-    async fn customer_id(&self) -> Res<i64> {
-        #[derive(Deserialize)]
-        struct Customer {
-            #[serde(deserialize_with = "int")]
-            id: i64,
-            #[serde(deserialize_with = "text")]
-            customer_name: String,
-        }
-        let all: Vec<Customer> = self.get("customers").await?;
-        all.into_iter()
-            .find(|c| c.customer_name.trim().eq_ignore_ascii_case(CUSTOMER))
-            .map(|c| c.id)
-            .ok_or_else(|| AppError::nbs(format!("NBS has no customer named {CUSTOMER}.")))
+    pub async fn customers(&self) -> Res<Vec<Customer>> {
+        self.get("customers").await
     }
 
     /// File OB + CS for one date, skipping whichever kind NBS already has.
@@ -437,7 +446,8 @@ impl Nbs {
         let ob = if has_ob {
             skipped()
         } else {
-            let payload = ob_payload(&me, date, self.customer_id().await?, &time_in, &time_out, hours, &req.ob_reason);
+            let customer_id = find_customer(&self.customers().await?, &req.customer)?;
+            let payload = ob_payload(&me, date, customer_id, &time_in, &time_out, hours, &req.ob_reason);
             outcome(self.post(OB, &payload).await?)
         };
         let cs = if has_cs {
@@ -575,7 +585,22 @@ mod tests {
             time_out: time_out.into(),
             ob_reason: "Work from home".into(),
             cs_reason: "WFH".into(),
+            customer: String::new(),
         }
+    }
+
+    #[test]
+    fn files_against_the_chosen_customer_or_the_built_in_one() {
+        let c = |id, name: &str| Customer { id, customer_name: name.into() };
+        let all = [c(5, "315 CORPORATE OFFICE"), c(8, " Acme Site ")];
+        assert_eq!(find_customer(&all, "").unwrap(), 5);
+        assert_eq!(find_customer(&all, "  ").unwrap(), 5);
+        assert_eq!(find_customer(&all, "acme site").unwrap(), 8);
+        assert_eq!(find_customer(&all, "Nope").unwrap_err().kind, "nbs");
+        // An older UI that sends no customer still files against the built-in one.
+        let old: FileRequest = serde_json::from_value(json!({"date": "2026-07-07", "shift_id": 9, "shift_name": "s",
+            "time_in": "07:30", "time_out": "17:30", "ob_reason": "a", "cs_reason": "b"})).unwrap();
+        assert_eq!(old.customer, "");
     }
 
     #[test]
@@ -638,7 +663,7 @@ mod tests {
             let css = nbs.cs_filings(&month_start, &today).await.unwrap();
             let shifts = nbs.shifts().await.unwrap();
             assert!(!shifts.is_empty());
-            let _ = nbs.customer_id().await.unwrap();
+            find_customer(&nbs.customers().await.unwrap(), "").unwrap();
             println!("ok: {} OB, {} CS this month, {} shifts", obs.len(), css.len(), shifts.len());
         });
     }
