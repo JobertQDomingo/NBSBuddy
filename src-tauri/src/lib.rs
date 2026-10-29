@@ -123,7 +123,7 @@ async fn delete_filings(nbs: State<'_, Nbs>, date: String, kinds: Vec<String>) -
 /// Reads latest.json from the newest GitHub release. The only request NBSBuddy makes that
 /// isn't to NBS, and it sends nothing about the user.
 async fn find_update(app: &AppHandle) -> Res<Option<Update>> {
-    let failed = |e: tauri_plugin_updater::Error| AppError::update(format!("Couldn't check for updates: {e}"));
+    let failed = |e| AppError::update(format!("Couldn't check for updates: {}.", said(e)));
     app.updater_builder().timeout(Duration::from_secs(8)).build().map_err(failed)?.check().await.map_err(failed)
 }
 
@@ -141,8 +141,13 @@ async fn install_update(app: AppHandle) -> Res<()> {
     update
         .download_and_install(|_, _| {}, || {})
         .await
-        .map_err(|e| AppError::update(format!("Couldn't install the update: {e}")))?;
+        .map_err(|e| AppError::update(format!("Couldn't install the update: {}. Nothing was changed.", said(e))))?;
     app.restart()
+}
+
+/// The updater's error as one sentence without its own full stop, so ours can follow it.
+fn said(e: tauri_plugin_updater::Error) -> String {
+    e.to_string().trim_end_matches('.').to_string()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

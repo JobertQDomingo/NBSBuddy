@@ -142,11 +142,14 @@
         <span>{version}</span>
         <button type="button" class="btn" onclick={checkNow} disabled={busy}>{busy ? "Working…" : "Check for updates"}</button>
       </div>
-      <p class="hint" role="status">
-        {#if updateNote}{updateNote}
-        {:else if latest}{latest} is out. <button type="button" class="link" onclick={installNow} disabled={busy}>Update now</button> NBSBuddy restarts.
-        {:else if latest === null}You're up to date.{/if}
-      </p>
+      {#if updateNote}
+        <p class="sticker danger wide" role="alert">{updateNote}</p>
+      {:else}
+        <p class="hint" role="status">
+          {#if latest}{latest} is out. <button type="button" class="link" onclick={installNow} disabled={busy}>Update now</button> NBSBuddy restarts.
+          {:else if latest === null}You're up to date.{/if}
+        </p>
+      {/if}
       <label class="auto">
         <input type="checkbox" checked={autoUpdate.get()} onchange={(e) => autoUpdate.set(e.currentTarget.checked)} />
         Install updates automatically when NBSBuddy starts
@@ -225,6 +228,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+  }
+  .wide {
+    grid-column: 1 / -1;
   }
   .auto {
     grid-column: 2;

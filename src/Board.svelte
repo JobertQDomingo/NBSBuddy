@@ -23,6 +23,7 @@
   let update = $state(""); // a newer version on GitHub; empty when up to date or offline
   let confirmUpdate = $state(false);
   let updating = $state(false);
+  let updateError = $state(""); // shown in the update dialog, which stays open so it can't be missed
   let defaultsVersion = $state(0); // bumped on save so an open File CS/OB picks up the new defaults
   let seq = 0; // newest load wins; stale answers are dropped
   let tbody: HTMLTableSectionElement | undefined = $state();
@@ -79,13 +80,18 @@
 
   async function installUpdate() {
     updating = true;
+    updateError = "";
     try {
       await api.installUpdate(); // on success NBSBuddy closes and reopens, so this only returns on failure
     } catch (e) {
-      footer = (e as Error).message;
+      updateError = (e as Error).message;
     }
     updating = false;
+  }
+
+  function closeUpdate() {
     confirmUpdate = false;
+    updateError = "";
   }
 
   const strip = $derived.by(() => {
@@ -303,13 +309,17 @@
 {#if confirmUpdate}
   <Confirm
     title="Update to NBSBuddy {update}?"
-    confirm={updating ? "Updating…" : "Update now"}
-    cancel="Later"
+    confirm={updating ? "Updating…" : updateError ? "Try again" : "Update now"}
+    cancel={updateError ? "Close" : "Later"}
     busy={updating}
     onconfirm={installUpdate}
-    oncancel={() => (confirmUpdate = false)}
+    oncancel={closeUpdate}
   >
-    <p>NBSBuddy closes, installs the update and opens again. It takes a few seconds.</p>
+    {#if updateError}
+      <p class="sticker danger" role="alert">{updateError}</p>
+    {:else}
+      <p>NBSBuddy closes, installs the update and opens again. It takes a few seconds.</p>
+    {/if}
   </Confirm>
 {/if}
 
