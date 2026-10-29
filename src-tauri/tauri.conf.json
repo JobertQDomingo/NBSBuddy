@@ -27,6 +27,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "publisher": "Jobert Domingo",
     "shortDescription": "File OB + CS in NBS and check your payroll period before cutoff",
     "windows": {
@@ -39,5 +40,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5MjY3QTA4RUJDNjVCMDIKUldRQ1c4YnJDSG9tV1R3WmF1K3NVSFhyOTJLN3F3Um5jZ3E5cFBXc0NqQ05UeEd2d3EvWEZmeTgK",
+      "endpoints": ["https://github.com/JobertQDomingo/NBSBuddy/releases/latest/download/latest.json"],
+      "requireSignedVersion": true,
+      "windows": { "installMode": "passive" }
+    }
   }
 }

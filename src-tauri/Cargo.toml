@@ -27,6 +27,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock", "s
 base64 = "0.23.1"
 regex = "1.13.1"
 keyring = { version = "3", features = ["windows-native"] }
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }  # Windows' own TLS: no rustls crypto provider to install
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

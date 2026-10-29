@@ -1,4 +1,5 @@
 //! The NBS API client: login + token refresh, filings, create, void (delete), profile.
+//! Leave filings are only read, never filed or voided.
 //!
 //! Endpoints were taken from NBS's own web app. NBS is plain HTTP and only reachable
 //! over the company ZeroTier network.
@@ -17,13 +18,14 @@ use crate::shifts::{Shift, hhmm, parse_shift_times};
 pub const API_BASE: &str = "http://172.16.50.4:13641";
 pub const OB: &str = "official_business_filing";
 pub const CS: &str = "change_shift_filing";
+pub const LEAVE: &str = "leave_filing";
 const CUSTOMER: &str = "315 CORPORATE OFFICE";
 pub const PENDING: &str = "For Approval";
 
 // ---- errors ----
 
 /// What the UI gets on failure. `kind`: "auth" (show sign-in), "offline" (ZeroTier),
-/// "nbs" (NBS refused), "input" (fix the form).
+/// "nbs" (NBS refused), "input" (fix the form), "update" (GitHub update check or install).
 #[derive(Debug, Clone, Serialize)]
 pub struct AppError {
     pub kind: &'static str,
@@ -42,6 +44,9 @@ impl AppError {
     }
     pub fn nbs(message: impl Into<String>) -> Self {
         Self::new("nbs", message)
+    }
+    pub fn update(message: impl Into<String>) -> Self {
+        Self::new("update", message)
     }
     fn signed_out() -> Self {
         Self::auth("Your NBS session ended. Sign in again.")
@@ -119,6 +124,24 @@ pub struct CsFiling {
     pub is_voided: i64,
     #[serde(default, deserialize_with = "int")]
     pub is_posted: i64,
+}
+
+/// One row per date. NBS sends more (balance, approver, ...); only these are read.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct LeaveFiling {
+    #[serde(default, deserialize_with = "text")]
+    pub date: String,
+    #[serde(default, deserialize_with = "text")]
+    pub leave_type: String,
+    /// "1.000000" for a whole day, "0.500000" for a half day.
+    #[serde(default, deserialize_with = "text")]
+    pub days: String,
+    #[serde(default, deserialize_with = "text")]
+    pub reason: String,
+    #[serde(default, deserialize_with = "text")]
+    pub status: String,
+    #[serde(default, deserialize_with = "int")]
+    pub is_voided: i64,
 }
 
 /// Only "For Approval" filings that payroll hasn't posted may be deleted (voided).
@@ -296,6 +319,7 @@ async fn nbs_message(r: reqwest::Response) -> String {
 impl Nbs {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
+            .no_proxy() // NBS is on ZeroTier; the updater's system-proxy feature must not route it to a proxy
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(20))
             .build()
@@ -406,6 +430,10 @@ impl Nbs {
 
     pub async fn cs_filings(&self, from: &str, to: &str) -> Res<Vec<CsFiling>> {
         self.get(&format!("{CS}/get_filings?{}", filings_query(from, to))).await
+    }
+
+    pub async fn leave_filings(&self, from: &str, to: &str) -> Res<Vec<LeaveFiling>> {
+        self.get(&format!("{LEAVE}/get_filings?{}", filings_query(from, to))).await
     }
 
     pub async fn shifts(&self) -> Res<Vec<Shift>> {
@@ -646,10 +674,14 @@ mod tests {
 
     /// Read-only check against the real NBS (needs ZeroTier); never files or deletes:
     /// `NBS_USER=... NBS_PASS=... cargo test live -- --ignored --nocapture`
+    /// (without NBS_USER/NBS_PASS it uses the app's remembered login).
     #[test]
     #[ignore]
     fn live_read_only() {
-        let (user, pass) = (std::env::var("NBS_USER").unwrap(), std::env::var("NBS_PASS").unwrap());
+        let (user, pass) = match (std::env::var("NBS_USER"), std::env::var("NBS_PASS")) {
+            (Ok(u), Ok(p)) => (u, p),
+            _ => creds::load().expect("set NBS_USER and NBS_PASS, or sign in once with Remember me"),
+        };
         tauri::async_runtime::block_on(async {
             let nbs = Nbs::new();
             assert!(nbs.reachable().await, "NBS unreachable: ZeroTier?");
@@ -661,10 +693,11 @@ mod tests {
             let month_start = format!("{}-01", &today[..7]);
             let obs = nbs.ob_filings(&month_start, &today).await.unwrap();
             let css = nbs.cs_filings(&month_start, &today).await.unwrap();
+            let leaves = nbs.leave_filings(&month_start, &today).await.unwrap();
             let shifts = nbs.shifts().await.unwrap();
             assert!(!shifts.is_empty());
             find_customer(&nbs.customers().await.unwrap(), "").unwrap();
-            println!("ok: {} OB, {} CS this month, {} shifts", obs.len(), css.len(), shifts.len());
+            println!("ok: {} OB, {} CS, {} leave this month, {} shifts", obs.len(), css.len(), leaves.len(), shifts.len());
         });
     }
 
@@ -680,5 +713,15 @@ mod tests {
 
         let f: ObFiling = serde_json::from_str(r#"{"id":"12","date":"2026-07-07","hours_filed":null,"status":"For Approval","is_voided":"0"}"#).unwrap();
         assert_eq!((f.id, f.hours_filed.as_str(), f.is_voided, f.is_posted), (12, "", 0, 0));
+
+        // The fields we read from a real leave_filing/get_filings row.
+        let l: LeaveFiling = serde_json::from_str(
+            r#"{"id":31442,"date":"2026-06-11","leave_type":"Vacation Leave","days":"0.500000","reason":null,"status":"For Approval","is_voided":0}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (l.date.as_str(), l.leave_type.as_str(), l.days.as_str(), l.reason.as_str(), l.status.as_str(), l.is_voided),
+            ("2026-06-11", "Vacation Leave", "0.500000", "", "For Approval", 0)
+        );
     }
 }

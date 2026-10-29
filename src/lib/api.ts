@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export class ApiError extends Error {
-  /** "auth" (sign in again), "offline" (ZeroTier), "nbs" (NBS refused), "input" (fix the form) */
+  /** "auth" (sign in again), "offline" (ZeroTier), "nbs" (NBS refused), "input" (fix the form), "update" (GitHub check or install) */
   constructor(public kind: string, message: string) {
     super(message);
   }
@@ -78,6 +78,8 @@ export type Row = {
   status_tip: string;
   ob: Filing | null;
   cs: Filing | null;
+  /** "Vacation Leave (half day) · For Approval"; empty when there's no leave. Read-only. */
+  leave: string;
 };
 
 export type RailDay = {
@@ -118,6 +120,8 @@ export const api = {
   customers: () => call<string[]>("customers"),
   fileDay: (request: FileRequest) => call<FileOutcome>("file_day", { request }),
   deleteFilings: (date: string, kinds: string[]) => call<string[]>("delete_filings", { date, kinds }),
+  checkUpdate: () => call<string | null>("check_update"),
+  installUpdate: () => call<void>("install_update"),
 };
 
 /** Per-PC conveniences (onboarding seen, last username, filing defaults). Never required. */
@@ -136,6 +140,12 @@ export const local = {
       /* private mode / blocked storage: fine */
     }
   },
+};
+
+/** Install updates when NBSBuddy starts (Settings). On unless the user turned it off. */
+export const autoUpdate = {
+  get: () => local.get("autoUpdate") !== "0",
+  set: (on: boolean) => local.set("autoUpdate", on ? "1" : "0"),
 };
 
 /** What a new filing starts with until Settings changes it. */

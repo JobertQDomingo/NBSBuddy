@@ -112,18 +112,19 @@
     const out: string[] = [];
     if (weekend) out.push(`${parseIso(date).toLocaleDateString("en-US", { weekday: "long" })} is a weekend; you'll be asked to confirm.`);
     if (row) {
+      if (row.leave) out.push(`Leave on this date: ${row.leave}.`);
       if (ob && cs) out.push("OB and CS are already filed for this date. This shows what NBS has.");
       else if (ob || cs) {
         const [kind, f] = ob ? ["OB", ob] : ["CS", cs!];
         out.push(`${kind} is already filed (${f.status}), so only ${kind === "OB" ? "CS" : "OB"} will be filed.`);
-      } else out.push("Nothing filed for this date yet.");
+      } else if (!row.leave) out.push("Nothing filed for this date yet.");
       const bad = [ob?.status === "Disapproved" ? "OB" : "", cs?.status === "Disapproved" ? "CS" : ""].filter(Boolean);
       if (bad.length)
         out.push(`${bad.join(" and ")} ${bad.length === 1 ? "was" : "were"} disapproved: refile in NBS, since NBSBuddy skips dates that already have a filing.`);
     }
     return out.join(" ");
   });
-  const noteTone = $derived(weekend || ob || cs ? "attention" : "");
+  const noteTone = $derived(weekend || ob || cs || row?.leave ? "attention" : "");
 
   function filedText(o: FileOutcome) {
     const part = (kind: string, created: boolean, what: string) => (created ? `${kind} ${what}` : `${kind} already filed, skipped`);

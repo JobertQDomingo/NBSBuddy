@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { api, defaults, DEFAULTS, type Defaults } from "./lib/api";
+  import { getVersion } from "@tauri-apps/api/app";
+  import { api, autoUpdate, defaults, DEFAULTS, type Defaults } from "./lib/api";
   import Modal from "./Modal.svelte";
 
   let { onclose, onsaved, onerror }: { onclose: () => void; onsaved: () => void; onerror: (e: unknown) => string } = $props();
@@ -33,6 +34,34 @@
     }
   }
   onMount(loadCustomers);
+
+  // Updates: their own card, saved the moment they change (not part of Save defaults).
+  let version = $state("");
+  let latest = $state<string | null | undefined>(undefined); // undefined until checked, null when up to date
+  let updateNote = $state(""); // the last check's or install's error
+  let busy = $state(false);
+  onMount(() => getVersion().then((v) => (version = v)));
+
+  async function checkNow() {
+    busy = true;
+    updateNote = "";
+    try {
+      latest = await api.checkUpdate();
+    } catch (e) {
+      updateNote = (e as Error).message;
+    }
+    busy = false;
+  }
+
+  async function installNow() {
+    busy = true;
+    try {
+      await api.installUpdate(); // NBSBuddy closes and reopens on success
+    } catch (e) {
+      updateNote = (e as Error).message;
+    }
+    busy = false;
+  }
 
   const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
   const picker = $derived(!!customers?.length); // the customer only changes against NBS's own list
@@ -106,6 +135,27 @@
       </p>
     </fieldset>
 
+    <fieldset class="card">
+      <legend class="overline">Updates</legend>
+      <span class="key">Version</span>
+      <div class="row">
+        <span>{version}</span>
+        <button type="button" class="btn" onclick={checkNow} disabled={busy}>{busy ? "Working…" : "Check for updates"}</button>
+      </div>
+      {#if updateNote}
+        <p class="sticker danger wide" role="alert">{updateNote}</p>
+      {:else}
+        <p class="hint" role="status">
+          {#if latest}{latest} is out. <button type="button" class="link" onclick={installNow} disabled={busy}>Update now</button> NBSBuddy restarts.
+          {:else if latest === null}You're up to date.{/if}
+        </p>
+      {/if}
+      <label class="auto">
+        <input type="checkbox" checked={autoUpdate.get()} onchange={(e) => autoUpdate.set(e.currentTarget.checked)} />
+        Install updates automatically when NBSBuddy starts
+      </label>
+    </fieldset>
+
     {#if listError}
       <p class="sticker attention" role="status">
         {listError}
@@ -169,6 +219,24 @@
   }
   .attention .link {
     padding: 0 2px;
+  }
+  .key {
+    font-weight: 600;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .wide {
+    grid-column: 1 / -1;
+  }
+  .auto {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   footer {
     display: flex;

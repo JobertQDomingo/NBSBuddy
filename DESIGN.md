@@ -254,7 +254,7 @@ The page reads at arm's length, so it runs its own steps: **15 / 18 / 21 / 28 / 
 ## Layout
 
 The window is a fixed 1133×778 (it can't be resized or maximized), laid out as a single column with 14–16px margins and 12px vertical spacing; the table's Reasons column takes the leftover width.
-1. **Top bar** (8px gaps): on the left, the joined period stepper with a 3px shadow, plus a "Back to current period" link that appears only when you've moved away. On the right, three square icon buttons drawn in ink (refresh, the lemon plus that opens **File CS/OB**, and the settings gear), each naming itself and its shortcut in a tooltip and accessible name, then the user chip (initials sticker + first name) that opens the profile.
+1. **Top bar** (8px gaps): on the left, the joined period stepper with a 3px shadow, plus a "Back to current period" link that appears only when you've moved away. On the right, a lemon **Update to X** button with a drawn download arrow, shown only when a newer version is out and wasn't installed at startup (it asks first: "NBSBuddy closes, installs the update and opens again", with focus on Later; if the install fails, the dialog stays open with the reason in a Tomato sticker and Try again / Close), then three square icon buttons drawn in ink (refresh, the lemon plus that opens **File CS/OB**, and the settings gear), each naming itself and its shortcut in a tooltip and accessible name, then the user chip (initials sticker + first name) that opens the profile.
 2. **Status strip card** (5px shadow):
    - Left: the display headline inside a tone sticker, then the detail line ("To file: Jul 7 · Disapproved, refile in NBS: Jul 8 · Late/undertime: …"), then the meta line.
    - Right: the day rail.
@@ -318,12 +318,12 @@ Depth means **hard offset shadows only**: a solid Ink copy of the shape, shifted
 
 ### Status Pills (signature)
 One verdict per day, painted as a sticker centered in the Status cell. It has a 2px shadow and a 2px Ink outline (3px for Needs action).
-- **Done** (Mint): OB and CS are both approved.
+- **Done** (Mint): OB and CS are both approved, plus the leave if there is one. A whole-day leave stands in for OB and CS.
 - **Waiting** (white): filed and awaiting approval.
 - **Due today** (Lemon): today, not fully filed.
-- **Needs action** (Tomato): a past workday missing OB or CS, a disapproved filing, or a time mismatch.
+- **Needs action** (Tomato): a past workday missing OB or CS, a disapproved filing (leave included), or a time mismatch.
 
-Weekend and upcoming days get no pill. The tooltip shows the OB and CS statuses and the customer.
+Weekend and upcoming days get no pill. The tooltip shows the OB and CS statuses and the customer, then the leave when there is one. Leave is read from NBS only; the app never files it.
 
 ### Status Strip
 - **Headline sticker:** shows the tone. Tomato means days need action ("2 days need action"), Lemon means only today is left, and Mint means all filed. While loading, it is plain muted text with no sticker.
@@ -381,7 +381,7 @@ One grammar, used in two places. Nothing on the board, in dialogs or in sign-in 
 ### Sign-in, onboarding, profile, settings
 - **Onboarding** (first run only): Buddy speaks through four steps (see Layout), with the slap and the beat.
 - **Sign-in:** the mascot, username, password, and "Remember me on this PC" (on by default; the login goes to Windows Credential Manager). Errors are a Tomato sticker; a lost connection is a Lemon notice with Try again.
-- **Settings** (the drawn gear button in the header, or Ctrl+,): a dialog with one "Filing defaults" card: OB reason, CS reason and the NBS customer every OB goes to. Saved on this PC. Save stays disabled until something changes; Reset to app defaults refills the form without saving. File CS/OB shows the customer as a read-only line (a Lemon sticker plus "your pick" when it isn't the app default) with a Change in Settings link that opens Settings on top; Ctrl+, does the same.
+- **Settings** (the drawn gear button in the header, or Ctrl+,): a dialog with one "Filing defaults" card: OB reason, CS reason and the NBS customer every OB goes to. Saved on this PC. Save stays disabled until something changes; Reset to app defaults refills the form without saving. File CS/OB shows the customer as a read-only line (a Lemon sticker plus "your pick" when it isn't the app default) with a Change in Settings link that opens Settings on top; Ctrl+, does the same. A second **Updates** card shows the version, a Check for updates button with its result line below ("You're up to date." or "X is out. Update now"; a failed check or install is a Tomato sticker across the card), and *Install updates automatically when NBSBuddy starts*, ticked by default and saved the moment it changes (not part of Save defaults). With it on, the boot screen reads "Checking for updates…", then "Updating NBSBuddy to X…" when one is found.
 - **Profile:** a dialog with a Mint initials sticker, the name in display type, and a card of work fields from NBS (empty ones hidden). Log out also forgets the saved login.
 - **Mascot:** a Lemon rounded sticker with an Ink face and a hard Ink shadow; it is also the app icon ([app-icon.svg](app-icon.svg)). It is still by default; `alive` adds the blink and the pointer-following eyes.
 
