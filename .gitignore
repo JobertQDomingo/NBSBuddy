@@ -28,4 +28,7 @@ dist-ssr
 .taste-skill/
 PRODUCT.md
 docs/assets/*.json
-.claude/
+
+# Claude Code: local plans and settings stay on this PC; project skills (like /release) are shared
+.claude/*
+!.claude/skills/
