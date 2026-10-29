@@ -4,6 +4,7 @@
   import { dayLabel, parseIso } from "./lib/period";
   import Modal from "./Modal.svelte";
   import Confirm from "./Confirm.svelte";
+  import ShiftPicker from "./ShiftPicker.svelte";
 
   let {
     date: initialDate,
@@ -201,10 +202,8 @@
       {#if filedView}
         <input id="f-shift" value={cs?.shift ?? ""} readonly />
       {:else}
-        <select id="f-shift" value={shiftId} onchange={(e) => pickShift(+e.currentTarget.value)} disabled={busy || !shifts.length}>
-          {#if !shifts.length}<option value={0}>Loading shifts…</option>{/if}
-          {#each shifts as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
-        </select>
+        <ShiftPicker id="f-shift" {shifts} value={shiftId} disabled={busy || !shifts.length} onpick={pickShift} />
+        <p class="hint muted">Type to search, like 730, 8-6 or night.</p>
       {/if}
 
       <label for="f-in">OB time</label>
@@ -338,6 +337,11 @@
   }
   .customer {
     overflow-wrap: anywhere;
+  }
+  .hint {
+    grid-column: 2;
+    margin-top: -6px;
+    font-size: 12px;
   }
   .customer .link {
     padding: 0 2px;

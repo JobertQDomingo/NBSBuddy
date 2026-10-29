@@ -23,6 +23,11 @@ Run every command with Bash. At the first check that fails, stop and report it.
 - Show the current version, the new version and the commit list. Wait for the user to confirm the number.
 - If `git ls-remote --tags origin vX.Y.Z` prints a line, stop: that version is already released.
 
+## 2b. Check What's new
+- A release with any `feat` commit since `$LAST` needs its own What's new steps: `grep -n "VERSIONS =" src/WhatsNew.svelte` must list `"X.Y.Z"`. Only `fix`, `docs`, `chore` or `ci` commits need none.
+- If it's missing, stop. List the features without a step and offer to design them in a normal feature PR that merges before this release (the release PR only changes the version). One step per user-facing feature of X.Y.Z only, never repeating earlier versions' features: a short Buddy-voice headline, one or two plain sentences, and a small demo drawn with the board's own stickers, like the existing steps. Append `"X.Y.Z"` to `VERSIONS` once per new step.
+- No version in `VERSIONS` may be newer than X.Y.Z. A step tagged with a guessed version that this release isn't (say `"0.3.0"` when releasing 0.2.1) would hide the real 0.3.0's steps later. If you find one, stop and retag it to X.Y.Z in a fix PR.
+
 ## 3. Open the release PR
     git switch -c release/vX.Y.Z
     npm version X.Y.Z --no-git-tag-version

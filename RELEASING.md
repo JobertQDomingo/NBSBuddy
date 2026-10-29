@@ -36,6 +36,7 @@ git branch -D feat/short-name        # capital D: git can't tell a squashed bran
 
 - **Your PR title becomes a line in the next release's notes**, for example `feat: show sick leave balance`. Write it for the person reading them.
 - **The next release ships everything on `main`**, so only merge what's ready.
+- **Every release with a new feature gets its own What's new.** In the feature PR, add one step per feature to `src/WhatsNew.svelte`, each with its own small demo, and tag them with the coming version in `VERSIONS`. Only that version's features: earlier steps stay as they are. `/release` stops if a feature release has no steps. After updating, each PC shows the steps it hasn't seen once; a fix-only release shows nothing.
 
 ## Loop 2: a release
 

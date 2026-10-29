@@ -84,6 +84,8 @@ struct ShiftOption {
     /// "HH:MM" the shift implies; empty when its name has no readable times.
     time_in: String,
     time_out: String,
+    /// What the Shift search matches (shifts::search_keys).
+    keys: Vec<String>,
 }
 
 #[tauri::command]
@@ -98,6 +100,7 @@ async fn shifts_for(nbs: State<'_, Nbs>, date: String) -> Res<Vec<ShiftOption>> 
                 id: s.id,
                 time_in: p.map(|p| shifts::hhmm(p.time_in)).unwrap_or_default(),
                 time_out: p.map(|p| shifts::hhmm(p.time_out)).unwrap_or_default(),
+                keys: shifts::search_keys(&s.name),
                 name: s.name,
             }
         })

@@ -4,7 +4,12 @@
   import { api, autoUpdate, defaults, DEFAULTS, type Defaults } from "./lib/api";
   import Modal from "./Modal.svelte";
 
-  let { onclose, onsaved, onerror }: { onclose: () => void; onsaved: () => void; onerror: (e: unknown) => string } = $props();
+  let {
+    onclose,
+    onsaved,
+    onerror,
+    onnews,
+  }: { onclose: () => void; onsaved: () => void; onerror: (e: unknown) => string; /** open What's new */ onnews: () => void } = $props();
 
   const saved = defaults.get();
   let d = $state({ ...saved });
@@ -139,7 +144,7 @@
       <legend class="overline">Updates</legend>
       <span class="key">Version</span>
       <div class="row">
-        <span>{version}</span>
+        <span>{version} · <button type="button" class="link" onclick={onnews}>What's new</button></span>
         <button type="button" class="btn" onclick={checkNow} disabled={busy}>{busy ? "Working…" : "Check for updates"}</button>
       </div>
       {#if updateNote}
@@ -217,7 +222,8 @@
     margin-top: -4px;
     font-size: 12px;
   }
-  .attention .link {
+  .attention .link,
+  .row .link {
     padding: 0 2px;
   }
   .key {
