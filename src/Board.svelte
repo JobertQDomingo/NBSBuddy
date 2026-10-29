@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { api, ApiError, type Me, type PeriodView, type Row, type Verdict } from "./lib/api";
   import { currentPeriod, dayLabel, isoDate, samePeriod, stepPeriod, MONTHS, halfRange, type Period } from "./lib/period";
   import PeriodPicker from "./PeriodPicker.svelte";
@@ -7,6 +7,7 @@
   import Profile from "./Profile.svelte";
   import Settings from "./Settings.svelte";
   import Icon from "./Icon.svelte";
+  import Confirm from "./Confirm.svelte";
 
   let { me, onsignedout }: { me: Me; onsignedout: (message?: string) => void } = $props();
 
@@ -19,6 +20,9 @@
   let fileDate = $state<string | null>(null);
   let showProfile = $state(false);
   let showSettings = $state(false);
+  let update = $state(""); // a newer version on GitHub; empty when up to date or offline
+  let confirmUpdate = $state(false);
+  let updating = $state(false);
   let defaultsVersion = $state(0); // bumped on save so an open File CS/OB picks up the new defaults
   let seq = 0; // newest load wins; stale answers are dropped
   let tbody: HTMLTableSectionElement | undefined = $state();
@@ -67,6 +71,22 @@
     period; // reload whenever the period changes
     untrack(() => load());
   });
+
+  // Offline or GitHub blocked: no button, nothing else changes.
+  onMount(() => {
+    api.checkUpdate().then((v) => (update = v ?? ""), () => {});
+  });
+
+  async function installUpdate() {
+    updating = true;
+    try {
+      await api.installUpdate(); // on success NBSBuddy closes and reopens, so this only returns on failure
+    } catch (e) {
+      footer = (e as Error).message;
+    }
+    updating = false;
+    confirmUpdate = false;
+  }
 
   const strip = $derived.by(() => {
     if (loading && !view) return { tone: "muted", headline: `Loading ${shortLabel(period)}…`, detail: "", meta: "", tip: "" };
@@ -129,7 +149,7 @@
       showSettings = true; // also over File CS/OB, to fix the customer mid-filing
       return;
     }
-    if (fileDate || showProfile || showSettings) return;
+    if (fileDate || showProfile || showSettings || confirmUpdate) return;
     if (e.key === "F5") load();
     else if (e.ctrlKey && e.key.toLowerCase() === "n") fileDate = isoDate();
     else if (e.altKey && e.key === "ArrowLeft") period = stepPeriod(period, -1);
@@ -158,6 +178,11 @@
       <button class="link" onclick={() => (period = currentPeriod())}>Back to current period</button>
     {/if}
     <span class="grow"></span>
+    {#if update}
+      <button class="btn primary" onclick={() => (confirmUpdate = true)} title="NBSBuddy {update} is out. Click to update; the app restarts.">
+        <Icon name="download" />Update to {update}
+      </button>
+    {/if}
     <button class="btn icon" onclick={() => load()} disabled={loading} aria-label="Refresh (F5)" title="Reload this period from NBS (F5)">
       <Icon name="refresh" />
     </button>
@@ -274,6 +299,18 @@
       footer = "Saved on this PC. New filings use your new defaults.";
     }}
   />
+{/if}
+{#if confirmUpdate}
+  <Confirm
+    title="Update to NBSBuddy {update}?"
+    confirm={updating ? "Updating…" : "Update now"}
+    cancel="Later"
+    busy={updating}
+    onconfirm={installUpdate}
+    oncancel={() => (confirmUpdate = false)}
+  >
+    <p>NBSBuddy closes, installs the update and opens again. It takes a few seconds.</p>
+  </Confirm>
 {/if}
 
 <style>

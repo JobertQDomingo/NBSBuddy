@@ -1,7 +1,7 @@
 <script lang="ts">
   // Drawn header icons, never font glyphs (DESIGN.md): one 24-unit grid, one round ink stroke.
   // The gear has six chunky teeth so its gaps survive the stroke at header size.
-  let { name }: { name: "gear" | "refresh" | "plus" } = $props();
+  let { name }: { name: "gear" | "refresh" | "plus" | "download" } = $props();
 </script>
 
 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -14,6 +14,9 @@
     {:else if name === "refresh"}
       <path d="M17.82 16.89A7.6 7.6 0 1 1 15.80 5.42" />
       <path d="M15.42 1.64L16.84 6.02L12.34 6.97" />
+    {:else if name === "download"}
+      <path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5" />
+      <path d="M4.5 16v3.5h15V16" />
     {:else}
       <path d="M12 4.5v15M4.5 12h15" />
     {/if}
