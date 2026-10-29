@@ -1,18 +1,49 @@
-# Push a tag like v0.2.0 (matching "version" in package.json) to build the Windows
-# installer and publish it as a GitHub Release. The download page links to
-# releases/latest/download/NBSBuddy-setup.exe, so every release also uploads that name.
+# Merging a version bump in package.json to main builds, signs and publishes vX.Y.Z.
+# A push that doesn't change the version finds its tag already there and stops in seconds.
+# The release is built as a hidden draft and only published once every file is uploaded.
+# The download page links to releases/latest/download/NBSBuddy-setup.exe, so every
+# release also uploads that name. Never push a tag by hand: publishing creates it.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch: # re-run by hand after a failed release: gh workflow run release.yml
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  windows:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" > /dev/null; then
+            echo "v$V is already released, nothing to do."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: version
+    if: needs.version.outputs.new == 'true'
     runs-on: windows-latest
+    env:
+      V: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,27 +59,46 @@ jobs:
           workspaces: src-tauri -> target
 
       - run: npm ci
+      - run: npm run check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: Test
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Remove a draft left by an earlier failed run
+        shell: bash
+        run: |
+          if [ "$(gh release view "v$V" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+            gh release delete "v$V" --yes
+          fi
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: NBSBuddy ${{ github.ref_name }}
-          releaseBody: |
-            Download **NBSBuddy-setup.exe** below, run it, then sign in with your NBS account (ZeroTier must be connected).
-            Windows SmartScreen may warn because the installer isn't signed: click **More info → Run anyway**.
-          releaseDraft: false
+          tagName: v${{ env.V }}
+          releaseName: NBSBuddy v${{ env.V }}
+          releaseDraft: true
           args: --bundles nsis
 
       - name: Upload NBSBuddy-setup.exe (stable name for the download page)
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           Copy-Item $exe.FullName NBSBuddy-setup.exe
-          gh release upload "${{ github.ref_name }}" NBSBuddy-setup.exe --clobber
+          gh release upload "v$env:V" NBSBuddy-setup.exe --clobber
+
+      - name: Check every file is there, then publish
+        shell: bash
+        env:
+          INSTALL: |
+            Download **NBSBuddy-setup.exe** below, run it, then sign in with your NBS account (ZeroTier must be connected).
+            Windows SmartScreen may warn because the installer isn't signed: click **More info → Run anyway**.
+            Already have NBSBuddy 0.2.0 or later? It updates itself.
+        run: |
+          have=$(gh release view "v$V" --json assets --jq '.assets[].name')
+          for f in latest.json "NBSBuddy_${V}_x64-setup.exe" "NBSBuddy_${V}_x64-setup.exe.sig" NBSBuddy-setup.exe; do
+            grep -qxF "$f" <<< "$have" || { echo "::error::$f is missing, so v$V stays a draft."; exit 1; }
+          done
+          changes=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="v$V" -f target_commitish="$GITHUB_SHA" --jq .body)
+          printf '%s\n%s\n' "$INSTALL" "$changes" > notes.md
+          gh release edit "v$V" --draft=false --latest --notes-file notes.md
