@@ -1,14 +1,17 @@
-//! Tauri commands: the only door between the UI and NBS. Every NBS call, token and
-//! password stays on this (Rust) side.
+//! Tauri commands: the only door between the UI and the outside. Every NBS call, token
+//! and password stays on this (Rust) side, and so does the one other request: the update check.
 
 mod creds;
 mod nbs;
 mod shifts;
 mod summary;
 
+use std::time::Duration;
+
 use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 use nbs::{AppError, FileOutcome, FileRequest, Me, Nbs, Profile, Res};
 use summary::PeriodView;
@@ -117,9 +120,35 @@ async fn delete_filings(nbs: State<'_, Nbs>, date: String, kinds: Vec<String>) -
     nbs.delete_day(&date, &kinds).await
 }
 
+/// Reads latest.json from the newest GitHub release. The only request NBSBuddy makes that
+/// isn't to NBS, and it sends nothing about the user.
+async fn find_update(app: &AppHandle) -> Res<Option<Update>> {
+    let failed = |e: tauri_plugin_updater::Error| AppError::update(format!("Couldn't check for updates: {e}"));
+    app.updater_builder().timeout(Duration::from_secs(8)).build().map_err(failed)?.check().await.map_err(failed)
+}
+
+/// The newer NBSBuddy version on GitHub, or `None` when this copy is up to date.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Res<Option<String>> {
+    Ok(find_update(&app).await?.map(|u| u.version))
+}
+
+/// Downloads the update, checks its signature against the public key in tauri.conf.json,
+/// and runs the installer. NBSBuddy closes and opens again on the new version.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Res<()> {
+    let update = find_update(&app).await?.ok_or_else(|| AppError::update("NBSBuddy is already up to date."))?;
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| AppError::update(format!("Couldn't install the update: {e}")))?;
+    app.restart()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Nbs::new())
         .invoke_handler(tauri::generate_handler![
             server_reachable,
@@ -131,7 +160,9 @@ pub fn run() {
             shifts_for,
             customers,
             file_day,
-            delete_filings
+            delete_filings,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running NBSBuddy");

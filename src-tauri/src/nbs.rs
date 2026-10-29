@@ -25,7 +25,7 @@ pub const PENDING: &str = "For Approval";
 // ---- errors ----
 
 /// What the UI gets on failure. `kind`: "auth" (show sign-in), "offline" (ZeroTier),
-/// "nbs" (NBS refused), "input" (fix the form).
+/// "nbs" (NBS refused), "input" (fix the form), "update" (GitHub update check or install).
 #[derive(Debug, Clone, Serialize)]
 pub struct AppError {
     pub kind: &'static str,
@@ -44,6 +44,9 @@ impl AppError {
     }
     pub fn nbs(message: impl Into<String>) -> Self {
         Self::new("nbs", message)
+    }
+    pub fn update(message: impl Into<String>) -> Self {
+        Self::new("update", message)
     }
     fn signed_out() -> Self {
         Self::auth("Your NBS session ended. Sign in again.")
@@ -316,6 +319,7 @@ async fn nbs_message(r: reqwest::Response) -> String {
 impl Nbs {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
+            .no_proxy() // NBS is on ZeroTier; the updater's system-proxy feature must not route it to a proxy
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(20))
             .build()
