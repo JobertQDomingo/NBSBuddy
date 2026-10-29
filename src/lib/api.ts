@@ -94,7 +94,8 @@ export type RailDay = {
 
 export type Strip = { tone: Tone; headline: string; detail: string; cutoff: string; progress: string };
 export type PeriodView = { label: string; today: string; rows: Row[]; strip: Strip; rail: RailDay[] };
-export type ShiftOption = { id: number; name: string; time_in: string; time_out: string };
+/** keys: what the Shift search matches, lowercase ("7:30am", "17:30", "night", the name's words). */
+export type ShiftOption = { id: number; name: string; time_in: string; time_out: string; keys: string[] };
 
 export type FileRequest = {
   date: string;

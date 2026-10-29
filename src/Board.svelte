@@ -8,6 +8,7 @@
   import Settings from "./Settings.svelte";
   import Icon from "./Icon.svelte";
   import Confirm from "./Confirm.svelte";
+  import WhatsNew, { markSeen, newest, unseen } from "./WhatsNew.svelte";
 
   let { me, onsignedout }: { me: Me; onsignedout: (message?: string) => void } = $props();
 
@@ -25,6 +26,7 @@
   let updating = $state(false);
   let updateError = $state(""); // shown in the update dialog, which stays open so it can't be missed
   let defaultsVersion = $state(0); // bumped on save so an open File CS/OB picks up the new defaults
+  let news = $state(unseen()); // What's new steps on screen: once after an update, or reopened from Settings
   let seq = 0; // newest load wins; stale answers are dropped
   let tbody: HTMLTableSectionElement | undefined = $state();
 
@@ -150,12 +152,12 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.key === "F5") e.preventDefault(); // never reload the whole page
-    if (e.ctrlKey && e.key === "," && !showSettings && !showProfile) {
+    if (e.ctrlKey && e.key === "," && !showSettings && !showProfile && !news.length) {
       e.preventDefault();
       showSettings = true; // also over File CS/OB, to fix the customer mid-filing
       return;
     }
-    if (fileDate || showProfile || showSettings || confirmUpdate) return;
+    if (fileDate || showProfile || showSettings || confirmUpdate || news.length) return;
     if (e.key === "F5") load();
     else if (e.ctrlKey && e.key.toLowerCase() === "n") fileDate = isoDate();
     else if (e.altKey && e.key === "ArrowLeft") period = stepPeriod(period, -1);
@@ -303,6 +305,16 @@
       showSettings = false;
       defaultsVersion++;
       footer = "Saved on this PC. New filings use your new defaults.";
+    }}
+    onnews={() => (news = newest())}
+  />
+{/if}
+{#if news.length}
+  <WhatsNew
+    steps={news}
+    onclose={() => {
+      markSeen();
+      news = [];
     }}
   />
 {/if}

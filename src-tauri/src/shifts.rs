@@ -93,6 +93,51 @@ pub fn filter_shifts(shifts: &[Shift], weekday: u32) -> Vec<Shift> {
     out
 }
 
+/// What the Shift search matches, lowercase: a typed word matches when it starts one of these.
+/// Each time in every way people type it ("7:30am", "730am", "0730am", "17:30", "8am"),
+/// the part of the day ("morning", "night", "overnight"), and the name's own words.
+pub fn search_keys(name: &str) -> Vec<String> {
+    let lower = name.to_lowercase();
+    let mut keys: Vec<String> =
+        lower.split(|c: char| c.is_whitespace() || c == '-').filter(|w| !w.is_empty()).map(String::from).collect();
+    if let Some(p) = parse_shift_times(name) {
+        for t in [p.time_in, p.time_out] {
+            let (h, m) = (t / 3600, t % 3600 / 60);
+            let h12 = if h % 12 == 0 { 12 } else { h % 12 };
+            for (hour, ap) in [(h, ""), (h12, if h < 12 { "am" } else { "pm" })] {
+                keys.extend([
+                    format!("{hour}:{m:02}{ap}"),
+                    format!("{hour:02}:{m:02}{ap}"),
+                    format!("{hour}{m:02}{ap}"),
+                    format!("{hour:02}{m:02}{ap}"),
+                ]);
+                if m == 0 {
+                    keys.extend([format!("{hour}{ap}"), format!("{hour:02}{ap}")]);
+                }
+            }
+        }
+        let start = p.time_in / 3600;
+        let mut parts = vec![match start {
+            0..=11 => "morning",
+            12..=17 => "afternoon",
+            _ => "evening",
+        }];
+        if start < 7 {
+            parts.push("early");
+        }
+        if start >= 18 || p.time_out <= p.time_in {
+            parts.push("night");
+        }
+        if p.time_out <= p.time_in {
+            parts.extend(["overnight", "graveyard"]);
+        }
+        keys.extend(parts.into_iter().map(String::from));
+    }
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
 // ---- OB (actual) vs CS (scheduled) ----
 
 /// "8AM", "730AM", "13:00", "1130" -> "HH:MM".
@@ -203,6 +248,27 @@ mod tests {
         assert_eq!(ids(0), [2, 1, 6]); // Monday; 5 AM sorts after the day shifts
         assert_eq!(ids(4), [3]);
         assert_eq!(ids(5), [3, 2, 1, 6]); // same start: by name, "CW 10H" < "CW 9.5H"
+    }
+
+    #[test]
+    fn search_keys_cover_how_times_are_typed() {
+        let has = |name: &str, want: &[&str]| {
+            let keys = search_keys(name);
+            for w in want {
+                assert!(keys.iter().any(|k| k == w), "{name}: no {w} in {keys:?}");
+            }
+            keys
+        };
+        let day = has(
+            "CW 9.5H 730AM-530PM SP 30MIN BRK",
+            &["7:30am", "730am", "0730am", "07:30", "17:30", "1730", "5:30pm", "530pm", "0530pm", "morning", "cw", "9.5h"],
+        );
+        assert!(!day.iter().any(|k| k == "night" || k == "early"));
+        has("CW 9.5H 8AM-6PM SP 30MIN BRK", &["8am", "08am", "8:00am", "800am", "6pm", "18:00"]);
+        has("CW 10H 10PM-6AM SP 30MIN BRK", &["10pm", "22:00", "6am", "06:00", "evening", "night", "overnight"]);
+        has("CW 9.5H 5AM-3PM SP 30MIN BRK", &["early", "morning", "5am", "3pm", "15:00"]);
+        has("CW 10H 12PM-10PM SP 30MIN BRK", &["12pm", "12:00", "afternoon"]);
+        assert_eq!(search_keys("Work From Home"), ["from", "home", "work"]);
     }
 
     #[test]

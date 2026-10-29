@@ -5,6 +5,7 @@
   import Login from "./Login.svelte";
   import Board from "./Board.svelte";
   import Buddy from "./Buddy.svelte";
+  import { markSeen } from "./WhatsNew.svelte";
 
   let screen = $state<"boot" | "onboarding" | "login" | "board">("boot");
   let me = $state<Me | null>(null);
@@ -45,6 +46,7 @@
 
   function onboarded() {
     local.set("onboarded", "1");
+    markSeen(); // a new install has nothing to catch up on
     restore();
   }
 
