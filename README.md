@@ -44,12 +44,14 @@ NBS_USER=you NBS_PASS=secret cargo test --manifest-path src-tauri/Cargo.toml liv
 | `src/` | Svelte UI: `Onboarding`, `Login`, `Board`, `FileDialog`, `Profile`, `Settings` |
 | `docs/` | GitHub Pages download page |
 | `DESIGN.md` | The Sticker Board design system |
+| `RELEASING.md` | How to ship a change and a release |
+| `.claude/skills/release/` | The `/release` command for Claude Code |
 
 All NBS traffic, tokens and passwords stay in Rust, and so does the update check. The UI only calls the commands in `lib.rs`, plus Tauri's own version lookup.
 
 ## Release
 
-Every change goes through a PR into `main` and releases nothing. To ship what's on `main`:
+The full guide is [RELEASING.md](RELEASING.md). It covers both loops, the `/release` command in Claude Code that automates a release, and what to do when something goes wrong. In short: every change goes through a PR into `main` and releases nothing. To ship what's on `main`:
 
 1. Branch `release/vX.Y.Z`, run `npm version X.Y.Z --no-git-tag-version` (`package.json` holds the app's only version number), and commit `chore: release vX.Y.Z`.
 2. Open a PR. When CI is green, squash-merge it.
