@@ -405,7 +405,7 @@
           <ul class="claims">
             <li class="claim">
               <h3>Your password goes to NBS and nowhere else.</h3>
-              <p>Every request goes to NBS's own address on the company network. There is no other server.</p>
+              <p>Every request goes to NBS's own address on the company network. The only others go to GitHub, to check for a newer NBSBuddy and download it, and they send nothing about you.</p>
               <a href="https://github.com/JobertQDomingo/NBSBuddy/blob/main/src-tauri/src/nbs.rs">Read it in nbs.rs</a>
             </li>
             <li class="claim">
@@ -415,7 +415,7 @@
             </li>
             <li class="claim">
               <h3>The window you click can't reach the internet.</h3>
-              <p>The screen only talks to the app's own core, and only the core talks to NBS.</p>
+              <p>The screen only talks to the app's own core, and only the core goes online: to NBS, and to GitHub for updates.</p>
               <a href="https://github.com/JobertQDomingo/NBSBuddy/blob/main/src-tauri/tauri.conf.json">Read it in tauri.conf.json</a>
             </li>
             <li class="claim">
@@ -432,7 +432,7 @@
       <div class="wrap">
         <h2 id="install-title" class="display">How do I install it?</h2>
         <ol class="steps">
-          <li class="step" data-slap style="--i:1"><b>Download and run it.</b>Run <strong>NBSBuddy-setup.exe</strong>. No admin rights needed.</li>
+          <li class="step" data-slap style="--i:1"><b>Download and run it.</b>Run <strong>NBSBuddy-setup.exe</strong>. No admin rights needed. You only install once: after that NBSBuddy updates itself.</li>
           <li class="step" data-slap style="--i:2"><b>Connect ZeroTier.</b>NBS only answers on the company network, so keep ZeroTier on whenever you use NBSBuddy.</li>
           <li class="step" data-slap style="--i:3"><b>Sign in.</b>Use your NBS username and password. Tick Remember me to skip this next time.</li>
         </ol>
