@@ -70,7 +70,8 @@ async fn load_period(nbs: State<'_, Nbs>, year: i32, month: u32, half: u32) -> R
     let (from, to) = (p.start.format("%Y-%m-%d").to_string(), p.end.format("%Y-%m-%d").to_string());
     let obs = nbs.ob_filings(&from, &to).await?;
     let css = nbs.cs_filings(&from, &to).await?;
-    Ok(summary::period_view(&p, &obs, &css, chrono::Local::now().date_naive()))
+    let leaves = nbs.leave_filings(&from, &to).await?;
+    Ok(summary::period_view(&p, &obs, &css, &leaves, chrono::Local::now().date_naive()))
 }
 
 #[derive(Serialize)]

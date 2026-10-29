@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
 
-use crate::nbs::{CsFiling, ObFiling, is_pending};
+use crate::nbs::{CsFiling, LeaveFiling, ObFiling, is_pending};
 use crate::shifts::{TimeStatus, late_undertime_minutes, time_status};
 
 pub const DONE: &str = "Done";
@@ -68,14 +68,26 @@ pub struct DayRow {
     pub workday: bool,
     pub ob: Option<ObFiling>,
     pub cs: Option<CsFiling>,
+    pub leave: Option<LeaveFiling>,
+}
+
+/// A whole-day leave stands in for OB + CS; a half-day one ("0.500000") needs both beside it.
+fn whole_day(f: &LeaveFiling) -> bool {
+    parse_hours(&f.days) >= 1.0
+}
+
+/// "Vacation Leave", or "Vacation Leave (half day)".
+fn leave_name(f: &LeaveFiling) -> String {
+    let name = Some(f.leave_type.trim()).filter(|t| !t.is_empty()).unwrap_or("Leave");
+    if whole_day(f) { name.to_string() } else { format!("{name} (half day)") }
 }
 
 impl DayRow {
     fn ob_missing(&self) -> bool {
-        self.workday && self.ob.is_none()
+        self.workday && self.ob.is_none() && !self.leave.as_ref().is_some_and(whole_day)
     }
     fn cs_missing(&self) -> bool {
-        self.workday && self.cs.is_none()
+        self.workday && self.cs.is_none() && !self.leave.as_ref().is_some_and(whole_day)
     }
     fn missing(&self) -> Vec<&'static str> {
         [("OB", self.ob_missing()), ("CS", self.cs_missing())].into_iter().filter(|x| x.1).map(|x| x.0).collect()
@@ -89,6 +101,9 @@ impl DayRow {
         if let Some(f) = &self.cs {
             out.push(("CS", f.status.as_str()));
         }
+        if let Some(f) = &self.leave {
+            out.push(("Leave", f.status.as_str()));
+        }
         out
     }
     fn disapproved(&self) -> Vec<&'static str> {
@@ -101,6 +116,11 @@ impl DayRow {
         self.cs.as_ref().map(|f| f.new_shift_schedule.as_str()).unwrap_or("")
     }
     fn time_status(&self) -> TimeStatus {
+        // ponytail: a leave day's OB is short by design, so the check is skipped outright;
+        // compare against the part of the shift the leave doesn't cover if that ever matters.
+        if self.leave.is_some() {
+            return TimeStatus::Ok;
+        }
         time_status(&self.ob_time(), self.new_shift())
     }
     fn late_or_undertime(&self) -> bool {
@@ -112,7 +132,7 @@ fn clip5(s: &str) -> &str {
     s.get(..5).unwrap_or(s)
 }
 
-pub fn build_day_rows(p: &Period, obs: &[ObFiling], css: &[CsFiling]) -> Vec<DayRow> {
+pub fn build_day_rows(p: &Period, obs: &[ObFiling], css: &[CsFiling], leaves: &[LeaveFiling]) -> Vec<DayRow> {
     p.start
         .iter_days()
         .take_while(|d| *d <= p.end)
@@ -123,6 +143,12 @@ pub fn build_day_rows(p: &Period, obs: &[ObFiling], css: &[CsFiling]) -> Vec<Day
                 workday: is_workday(date),
                 ob: obs.iter().find(|f| f.date.starts_with(&iso) && f.is_voided == 0).cloned(),
                 cs: css.iter().find(|f| f.date.starts_with(&iso) && f.is_voided == 0).cloned(),
+                // A refile beats the disapproved leave it replaces.
+                leave: leaves
+                    .iter()
+                    .filter(|f| f.date.starts_with(&iso) && f.is_voided == 0)
+                    .min_by_key(|f| f.status == DISAPPROVED)
+                    .cloned(),
             }
         })
         .collect()
@@ -162,6 +188,9 @@ fn fmt_minutes(m: i32) -> String {
 /// Why a row looks the way it does, in words (colour is never the only signal).
 pub fn day_note(row: &DayRow, today: NaiveDate) -> String {
     let mut parts = Vec::new();
+    if let Some(f) = &row.leave {
+        parts.push(leave_name(f));
+    }
     let missing = row.missing();
     if !missing.is_empty() {
         if row.date > today {
@@ -226,6 +255,8 @@ pub struct PeriodSummary {
     pub workdays_left: usize,
     pub days_filed: usize,
     pub days_expected: usize,
+    /// Workdays with a leave that isn't disapproved (whole or half day).
+    pub on_leave: usize,
     pub total_hours: f64,
 }
 
@@ -250,8 +281,9 @@ pub fn compute_summary(rows: &[DayRow], today: NaiveDate) -> PeriodSummary {
         waiting: rows.iter().filter(|r| day_verdict(r, today) == WAITING).count(),
         upcoming: work.iter().filter(|r| r.date > today && r.filed().is_empty()).count(),
         workdays_left: work.iter().filter(|r| r.date >= today).count(),
-        days_filed: work.iter().filter(|r| r.ob.is_some() && r.cs.is_some() && r.disapproved().is_empty()).count(),
+        days_filed: work.iter().filter(|r| r.missing().is_empty() && r.disapproved().is_empty()).count(),
         days_expected: work.len(),
+        on_leave: work.iter().filter(|r| r.leave.as_ref().is_some_and(|f| f.status != DISAPPROVED)).count(),
         total_hours: rows
             .iter()
             .filter_map(|r| r.ob.as_ref())
@@ -312,12 +344,13 @@ pub fn strip_text(s: &PeriodSummary) -> Strip {
     };
     let mut cutoff = format!("Cutoff {}, {}", s.end.format("%a"), fmt_day(s.end));
     cutoff += &if s.today > s.end { " (passed)".to_string() } else { format!(" · {} left", plural(s.workdays_left, "workday")) };
+    let leave = if s.on_leave > 0 { format!(" ({} on leave)", s.on_leave) } else { String::new() };
     Strip {
         tone,
         headline,
         detail: if items.is_empty() { "No missing, disapproved or mismatched days.".into() } else { items.join(" · ") },
         cutoff,
-        progress: format!("{} of {} workdays filed · {} h", s.days_filed, s.days_expected, fmt_hours(s.total_hours)),
+        progress: format!("{} of {} workdays filed{leave} · {} h", s.days_filed, s.days_expected, fmt_hours(s.total_hours)),
     }
 }
 
@@ -365,6 +398,8 @@ pub struct RowView {
     pub status_tip: String,
     pub ob: Option<FilingView>,
     pub cs: Option<FilingView>,
+    /// "Vacation Leave (half day) · For Approval"; empty when there's no leave.
+    pub leave: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -421,11 +456,23 @@ fn row_view(row: &DayRow, today: NaiveDate) -> RowView {
         None if missing => format!("{kind}: not filed"),
         None => format!("{kind}: —"),
     };
-    let reasons: Vec<(&str, &str)> = [("OB", row.ob.as_ref().map(|f| f.reason.as_str())), ("CS", row.cs.as_ref().map(|f| f.reason.as_str()))]
-        .into_iter()
-        .filter_map(|(k, r)| r.filter(|r| !r.trim().is_empty()).map(|r| (k, r)))
-        .collect();
+    let reasons: Vec<(&str, &str)> = [
+        ("OB", row.ob.as_ref().map(|f| f.reason.as_str())),
+        ("CS", row.cs.as_ref().map(|f| f.reason.as_str())),
+        ("Leave", row.leave.as_ref().map(|f| f.reason.as_str())),
+    ]
+    .into_iter()
+    .filter_map(|(k, r)| r.filter(|r| !r.trim().is_empty()).map(|r| (k, r)))
+    .collect();
     let hours = row.ob.as_ref().map(|f| f.hours_filed.trim()).filter(|h| !h.is_empty()).map(|h| fmt_hours(parse_hours(h))).unwrap_or_default();
+    let mut status_tip = [
+        line("OB", row.ob.as_ref().map(|f| f.status.as_str()), row.ob_missing(), row.ob.as_ref().map_or("", |f| f.customer_name.as_str())),
+        line("CS", row.cs.as_ref().map(|f| f.status.as_str()), row.cs_missing(), ""),
+    ]
+    .join("\n");
+    if let Some(f) = &row.leave {
+        status_tip += &format!("\n{}", line("Leave", Some(&f.status), false, &leave_name(f)));
+    }
     RowView {
         date: iso(row.date),
         label: fmt_weekday(row.date),
@@ -439,11 +486,7 @@ fn row_view(row: &DayRow, today: NaiveDate) -> RowView {
         note: day_note(row, today),
         reasons: reasons.iter().map(|(k, r)| format!("{k}: {}", first_line(r))).collect::<Vec<_>>().join(" · "),
         reasons_tip: reasons.iter().map(|(k, r)| format!("{k} reason:\n{}", r.trim())).collect::<Vec<_>>().join("\n\n"),
-        status_tip: [
-            line("OB", row.ob.as_ref().map(|f| f.status.as_str()), row.ob_missing(), row.ob.as_ref().map_or("", |f| f.customer_name.as_str())),
-            line("CS", row.cs.as_ref().map(|f| f.status.as_str()), row.cs_missing(), ""),
-        ]
-        .join("\n"),
+        status_tip,
         ob: row.ob.as_ref().map(|f| FilingView {
             status: f.status.clone(),
             deletable: is_pending(&f.status, f.is_posted),
@@ -464,11 +507,12 @@ fn row_view(row: &DayRow, today: NaiveDate) -> RowView {
             shift: f.new_shift_schedule.clone(),
             customer: String::new(),
         }),
+        leave: row.leave.as_ref().map(|f| format!("{} · {}", leave_name(f), f.status)).unwrap_or_default(),
     }
 }
 
-pub fn period_view(p: &Period, obs: &[ObFiling], css: &[CsFiling], today: NaiveDate) -> PeriodView {
-    let rows = build_day_rows(p, obs, css);
+pub fn period_view(p: &Period, obs: &[ObFiling], css: &[CsFiling], leaves: &[LeaveFiling], today: NaiveDate) -> PeriodView {
+    let rows = build_day_rows(p, obs, css, leaves);
     PeriodView {
         label: period_label(p),
         today: iso(today),
@@ -534,7 +578,23 @@ mod tests {
             workday: is_workday(date),
             ob: x.ob.map(|s| ob(x.d, s, x.time_in, x.hours)),
             cs: x.cs.map(|s| cs(x.d, s)),
+            leave: None,
         }
+    }
+
+    fn lv(d: u32, status: &str, days: &str) -> LeaveFiling {
+        LeaveFiling {
+            date: iso(day(d)),
+            leave_type: "Vacation Leave".into(),
+            days: days.into(),
+            reason: "Family trip".into(),
+            status: status.into(),
+            is_voided: 0,
+        }
+    }
+
+    fn on_leave(x: R, status: &str, days: &str) -> DayRow {
+        DayRow { leave: Some(lv(x.d, status, days)), ..row(x) }
     }
 
     fn t() -> NaiveDate {
@@ -561,6 +621,15 @@ mod tests {
             (row(R { ob: Some("For Approval"), ..r(7) }), WAITING, "OB awaiting approval"),
             (row(r(7)), DONE, ""),
             (row(R { time_in: "08:30:00", ..r(7) }), DONE, "Late 30m"), // shift 8AM-6PM
+            // A whole-day leave stands in for OB + CS; it waits for approval like they do.
+            (on_leave(none(7), "Approved", "1.000000"), DONE, "Vacation Leave"),
+            (on_leave(none(7), "For Approval", "1.000000"), WAITING, "Vacation Leave · Leave awaiting approval"),
+            (on_leave(none(7), "Disapproved", "1.000000"), ACTION, "Vacation Leave · Leave disapproved, refile in NBS"),
+            // A half day still needs OB + CS, and its short OB isn't late.
+            (on_leave(none(7), "Approved", "0.500000"), ACTION, "Vacation Leave (half day) · Not filed"),
+            (on_leave(R { cs: None, ..r(7) }, "Approved", "0.500000"), ACTION, "Vacation Leave (half day) · CS not filed"),
+            (on_leave(R { time_in: "13:00:00", ..r(7) }, "Approved", "0.500000"), DONE, "Vacation Leave (half day)"),
+            (on_leave(R { ob: Some("For Approval"), ..r(7) }, "Approved", "0.500000"), WAITING, "Vacation Leave (half day) · OB awaiting approval"),
         ];
         for (row, verdict, note) in cases {
             assert_eq!((day_verdict(&row, t()), day_note(&row, t()).as_str()), (verdict, note), "{}", row.date);
@@ -575,6 +644,35 @@ mod tests {
         assert_eq!(row_tone(&row(none(4)), t()), "muted"); // Saturday
         assert_eq!(row_tone(&row(R { time_in: "08:30:00", ..r(7) }), t()), "attention");
         assert_eq!(row_tone(&row(r(7)), t()), "");
+        assert_eq!(row_tone(&on_leave(R { time_in: "13:00:00", ..r(7) }, "Approved", "0.500000"), t()), "");
+        assert_eq!(row_tone(&on_leave(none(7), "Disapproved", "1.000000"), t()), "danger");
+    }
+
+    #[test]
+    fn leave_in_the_summary() {
+        let mut rows = period();
+        rows[1] = on_leave(none(7), "Approved", "1.000000");
+        let s = compute_summary(&rows, t());
+        assert!(s.to_file.is_empty());
+        assert_eq!((s.days_filed, s.on_leave, s.needs_action()), (2, 1, 0));
+        assert_eq!(strip_text(&s).progress, "2 of 5 workdays filed (1 on leave) · 10 h");
+
+        rows[1] = on_leave(none(7), "Disapproved", "1.000000");
+        let s = compute_summary(&rows, t());
+        assert_eq!((s.to_refile.as_slice(), s.to_file.len(), s.on_leave), (&[day(7)][..], 0, 0));
+        assert!(strip_text(&s).detail.contains("Disapproved, refile in NBS: Jul 7"));
+
+        // A voided leave is gone, as a voided OB/CS is.
+        let p = Period { start: day(6), end: day(10) };
+        let voided = LeaveFiling { is_voided: 1, ..lv(7, "Approved", "1.000000") };
+        let rows = build_day_rows(&p, &[], &[], &[voided]);
+        assert!(rows[1].leave.is_none());
+        assert_eq!((day_verdict(&rows[1], t()), day_note(&rows[1], t()).as_str()), (ACTION, "Not filed"));
+        assert_eq!(build_day_rows(&p, &[], &[], &[lv(7, "Approved", "1.000000")])[1].leave.as_ref().unwrap().status, "Approved");
+
+        // Refiled after a disapproval: the refile counts, whichever order NBS sends them in.
+        let refiled = [lv(7, "Disapproved", "1.000000"), lv(7, "For Approval", "1.000000")];
+        assert_eq!(build_day_rows(&p, &[], &[], &refiled)[1].leave.as_ref().unwrap().status, "For Approval");
     }
 
     fn period() -> Vec<DayRow> {
@@ -633,11 +731,22 @@ mod tests {
 
         let p = make_period(2026, 7, 1).unwrap();
         let obs = [ob(6, "For Approval", "08:00:00", "10.000000")];
-        let v = period_view(&p, &obs, &[cs(6, "Approved")], t());
+        let v = period_view(&p, &obs, &[cs(6, "Approved")], &[lv(7, "Approved", "1.000000")], t());
         assert_eq!(v.rows.len(), 15);
         let mon = &v.rows[5];
         assert_eq!((mon.label.as_str(), mon.ob_time.as_str(), mon.hours.as_str()), ("Mon Jul 6", "08:00–18:00", "10"));
         assert!(mon.ob.as_ref().unwrap().deletable && !mon.cs.as_ref().unwrap().deletable);
         assert_eq!(mon.status_tip, "OB: For Approval · 315 CORPORATE OFFICE\nCS: Approved");
+        assert_eq!(mon.leave, "");
+
+        let tue = &v.rows[6];
+        assert_eq!((tue.verdict, tue.leave.as_str(), tue.note.as_str()), (DONE, "Vacation Leave · Approved", "Vacation Leave"));
+        assert_eq!(tue.status_tip, "OB: —\nCS: —\nLeave: Approved · Vacation Leave");
+        assert_eq!((tue.reasons.as_str(), tue.reasons_tip.as_str()), ("Leave: Family trip", "Leave reason:\nFamily trip"));
+        assert_eq!(v.rail.iter().find(|d| d.day == 7).unwrap().tip, "Tue Jul 7 · Vacation Leave");
+
+        let half = period_view(&p, &[], &[], &[lv(7, "For Approval", "0.500000")], t());
+        assert_eq!(half.rows[6].leave, "Vacation Leave (half day) · For Approval");
+        assert_eq!(half.rows[6].status_tip, "OB: not filed\nCS: not filed\nLeave: For Approval · Vacation Leave (half day)");
     }
 }

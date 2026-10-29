@@ -318,12 +318,12 @@ Depth means **hard offset shadows only**: a solid Ink copy of the shape, shifted
 
 ### Status Pills (signature)
 One verdict per day, painted as a sticker centered in the Status cell. It has a 2px shadow and a 2px Ink outline (3px for Needs action).
-- **Done** (Mint): OB and CS are both approved.
+- **Done** (Mint): OB and CS are both approved, plus the leave if there is one. A whole-day leave stands in for OB and CS.
 - **Waiting** (white): filed and awaiting approval.
 - **Due today** (Lemon): today, not fully filed.
-- **Needs action** (Tomato): a past workday missing OB or CS, a disapproved filing, or a time mismatch.
+- **Needs action** (Tomato): a past workday missing OB or CS, a disapproved filing (leave included), or a time mismatch.
 
-Weekend and upcoming days get no pill. The tooltip shows the OB and CS statuses and the customer.
+Weekend and upcoming days get no pill. The tooltip shows the OB and CS statuses and the customer, then the leave when there is one. Leave is read from NBS only; the app never files it.
 
 ### Status Strip
 - **Headline sticker:** shows the tone. Tomato means days need action ("2 days need action"), Lemon means only today is left, and Mint means all filed. While loading, it is plain muted text with no sticker.

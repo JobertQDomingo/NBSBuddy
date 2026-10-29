@@ -7,6 +7,7 @@ Your daily NBS sidekick: file your work-from-home **Official Business (OB)** and
 ## What it does
 
 - **Board:** every day of the semi-monthly payroll period (1–15, 16–end) with one verdict: *Done*, *Waiting*, *Due today* or *Needs action* (missing, disapproved, or OB times that don't match the shift). A status strip says how many days need action before cutoff.
+- **Leave:** your NBS leave filings show on the board (read-only; file leave in NBS). A whole-day leave stands in for OB + CS; a half day still needs both. A disapproved leave needs action like any other filing.
 - **File CS/OB** (the lemon + button, or Ctrl+N): pick the shift, and the OB times and hours come from it. It files both, skipping whichever NBS already has. Weekends ask first.
 - **Delete:** open a filed day and delete its OB and/or CS while NBS still has them *For Approval*, then file again.
 - **Sign-in:** your NBS account. "Remember me" keeps the login in Windows Credential Manager so the app signs in by itself next time. Log out forgets it.
@@ -24,7 +25,7 @@ npm run check          # type-check the Svelte/TS UI
 cargo test --manifest-path src-tauri/Cargo.toml   # verdicts, shift parsing, payloads
 ```
 
-Read-only check against the real NBS (needs ZeroTier; it never files or deletes anything):
+Read-only check against the real NBS (needs ZeroTier; it never files or deletes anything). Without `NBS_USER`/`NBS_PASS` it uses the app's remembered login:
 
 ```sh
 NBS_USER=you NBS_PASS=secret cargo test --manifest-path src-tauri/Cargo.toml live -- --ignored --nocapture

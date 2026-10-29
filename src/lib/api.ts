@@ -78,6 +78,8 @@ export type Row = {
   status_tip: string;
   ob: Filing | null;
   cs: Filing | null;
+  /** "Vacation Leave (half day) · For Approval"; empty when there's no leave. Read-only. */
+  leave: string;
 };
 
 export type RailDay = {
